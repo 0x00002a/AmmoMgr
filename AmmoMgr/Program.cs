@@ -45,7 +45,7 @@ namespace IngameScript
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
         internal List<IMyInventory> connected_invs_cache_ = new List<IMyInventory>();
-        internal List<HashSet<IMyInventory>> partitioned_invs_ = new List<HashSet<IMyInventory>>();
+        internal List<HashSet<InventoryData>> partitioned_invs_ = new List<HashSet<InventoryData>>();
 
         internal Dictionary<MyInventoryItem, double> claimed_items_cache_ = new Dictionary<MyInventoryItem, double>();
 
@@ -129,11 +129,19 @@ namespace IngameScript
             wc.GetAllCoreWeapons(readin);
 
         }
-       
+
 
         #endregion
 
         #region Running
+        internal InventoryData CreateInvData(IMyInventory inv)
+        {
+            var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
+
+            var item = new InventoryData { Inventory = inv, Requester = is_requester };
+            return item;
+
+        }
         internal void RefreshInventories(List<HashSet<InventoryData>> readin)
         {
             var block_cache = new List<IMyTerminalBlock>();
@@ -145,16 +153,23 @@ namespace IngameScript
             {
                 if (inv.Owner is IMyTerminalBlock)
                 {
-                    var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
-
-                    var item = new InventoryData { Inventory = inv, Requester = is_requester };
-
+                    var item = CreateInvData(inv);
                     var parition = readin.FirstOrDefault(set => set.Contains(item));
                     if (parition == null)
                     {
                         parition = new HashSet<InventoryData>();
+                        readin.Add(parition);
                     }
-                    flat_inventories.Where(i => inv.IsConnectedTo(i)).ForEach(i => parition.Add(i));
+                    foreach(var peer in flat_inventories)
+                    {
+                        if (inv.IsConnectedTo(peer))
+                        {
+                            if (peer.Owner is IMyTerminalBlock)
+                            {
+                                parition.Add(CreateInvData(peer));
+                            }
+                        }
+                    }
                 }
             }
             
@@ -273,13 +288,13 @@ namespace IngameScript
             var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
             if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 minutes 
             {
-                RefreshInventories(cached_inventories_, requesters_);
+                RefreshInventories(partitioned_invs_);
                 
             } else if (ticks_10 % 3 == 0)
             {
                 ClearLists(avaliability_lookup_);
                 ScanInventories(cached_inventories_, avaliability_lookup_);
-                RebalanceInventories(requesters_, avaliability_lookup_);
+                RebalanceInventories(partitioned_invs_, avaliability_lookup_);
             }
 
 
