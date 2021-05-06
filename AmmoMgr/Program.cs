@@ -35,16 +35,13 @@ namespace IngameScript
 
 
         #region Constants
-        internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazineDefinition";
-        internal const string VERSION = "0.1.0";
+        internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
+        internal const string VERSION = "0.1.1";
         #endregion
 
         #region Fields
-        internal List<IMyInventory> cached_inventories_ = new List<IMyInventory>();
-        internal List<IMyInventory> requesters_ = new List<IMyInventory>();
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
-        internal List<IMyInventory> connected_invs_cache_ = new List<IMyInventory>();
         internal List<HashSet<InventoryData>> partitioned_invs_ = new List<HashSet<InventoryData>>();
 
         internal Dictionary<MyInventoryItem, double> claimed_items_cache_ = new Dictionary<MyInventoryItem, double>();
@@ -62,10 +59,11 @@ namespace IngameScript
 
         #region Util 
 
-        internal static void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
+        internal void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
         {
             foreach(var item in items)
             {
+                console.Stdout.WriteLn($"ITEMT: {item.Type.TypeId}");
                 if (item.Type.TypeId.ToString() == AMMO_TYPE_NAME)
                 {
                     List<AmmoItemData> target_set;
@@ -134,6 +132,12 @@ namespace IngameScript
         #endregion
 
         #region Running
+        internal void WriteStatsToStdout()
+        {
+            console.Stdout.WriteLn($"Inventories: {partitioned_invs_.Sum(pre =>  pre.Count )}");
+
+        }
+
         internal InventoryData CreateInvData(IMyInventory inv)
         {
             var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
@@ -212,6 +216,7 @@ namespace IngameScript
 
         internal void RebalanceInventories(List<HashSet<InventoryData>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
+            console.Stdout.WriteLn($"AVAL: {avaliable.Count}");
             foreach (var ammo in avaliable)
             {
                 if (ammo.Value.Count != 0)
@@ -226,6 +231,7 @@ namespace IngameScript
                         var per_inv = total / nb_req;
 
                         var eligible_req = eligable_invs.Where(i => i.Requester).Select(i => i.Inventory);
+                        console.Stdout.WriteLn($"pi: {per_inv}, valc: {ammo.Value.Count}, eg: {inv_system.Count}");
                         AllotItems(per_inv, ammo.Value, eligible_req);
 
                     }
@@ -236,15 +242,19 @@ namespace IngameScript
 
         }
 
-        internal static void ScanInventories(List<IMyInventory> inventories, Dictionary<string, List<AmmoItemData>> readin)
+        internal void ScanInventories(List<HashSet<InventoryData>> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
+            console.Stdout.WriteLn($"INVS: {inventories.Count}");
             var items_tmp = new List<MyInventoryItem>();
-            foreach(var inv in inventories)
+            foreach(var part in inventories)
             {
-                items_tmp.Clear();
-                inv.GetItems(items_tmp);
+                foreach (var inv in part)
+                {
+                    items_tmp.Clear();
+                    inv.Inventory.GetItems(items_tmp);
 
-                SortItems(inv, items_tmp, readin);
+                    SortItems(inv.Inventory, items_tmp, readin);
+                }
 
             }
         }
@@ -297,10 +307,11 @@ namespace IngameScript
             } else if (ticks_10 % 3 == 0)
             {
                 ClearLists(avaliability_lookup_);
-                ScanInventories(cached_inventories_, avaliability_lookup_);
+                ScanInventories(partitioned_invs_, avaliability_lookup_);
                 RebalanceInventories(partitioned_invs_, avaliability_lookup_);
             }
 
+            WriteStatsToStdout();
             console.PrintOutput(this);
 
 
