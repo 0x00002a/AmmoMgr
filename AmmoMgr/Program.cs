@@ -31,40 +31,134 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazineDefinition";
+        internal const string VERSION = "0.1.0";
         #endregion
 
         #region Fields
         internal List<IMyInventory> cached_inventories_ = new List<IMyInventory>();
         internal List<IMyInventory> requesters_ = new List<IMyInventory>();
+        internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
+        internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
 
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
 
         internal ulong ticks_10 = 0;
+
+        internal Console console = new Console
+        {
+            ClearOnPrint = true,
+            Header = $"== AmmoMgr v{VERSION} ==",
+        };
+        #endregion
+
+        #region Util 
+
+        internal static void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
+        {
+            foreach(var item in items)
+            {
+                if (item.Type.TypeId.ToString() == AMMO_TYPE_NAME)
+                {
+                    List<AmmoItemData> target_set;
+                    var key = item.Type.SubtypeId.ToString();
+
+                    var found = true;
+                    if (!readin.TryGetValue(key, out target_set))
+                    {
+                        target_set = new List<AmmoItemData>();
+                        found = false;
+                    }
+
+                    target_set.Add(new AmmoItemData { Item = item, Parent = parent });
+                    if (!found)
+                    {
+                        readin.Add(key, target_set);
+                    }
+                }
+            }
+        }
+        internal static void ClearLists<T, V>(Dictionary<T, List<V>> dict)
+        {
+            foreach (var val in dict.Values)
+            {
+                val.Clear();
+            }
+        }
+       
+        internal bool IsWeapon(IMyTerminalBlock entity)
+        {
+            if (entity is IMyUserControllableGun)
+            {
+                return true;
+            } else
+            {
+                var id = new MyDefinitionId(entity.BlockDefinition.TypeId, entity.BlockDefinition.SubtypeId);
+
+                return wc_weapons_.Contains(id);
+            }
+        }
+        internal bool CanContainItem(IMyEntity entity, MyInventoryItem ammo)
+        {
+            if (entity.HasInventory)
+            {
+                var inv = entity.GetInventory();
+                HashSet<MyItemType> allowed;
+                if (!inv_allowlist_cache_.TryGetValue(inv, out allowed))
+                {
+                    allowed = new HashSet<MyItemType>();
+                    inv.GetAcceptedItems(null, t => { allowed.Add(t); return false; });
+                    inv_allowlist_cache_.Add(inv, allowed);
+                }
+
+                return allowed.Contains(ammo.Type);
+            }
+            return false;
+            
+        }
         #endregion
 
         #region Init
-        internal void RefreshInventories(List<IMyInventory> inventories)
-        {
-            var block_cache = new List<IMyTerminalBlock>();
-            GridTerminalSystem.GetBlocks(block_cache);
 
-            inventories.Clear();
-            inventories.AddRange(
-                    block_cache
-                    .Where(b => b.HasInventory)
-                    .Select(b => b.GetInventory()));
+        internal static void ScanForWeapons(WcPbApi wc, ICollection<MyDefinitionId> readin)
+        {
+            wc.GetAllCoreStaticLaunchers(readin);
+            wc.GetAllCoreTurrets(readin);
+            wc.GetAllCoreWeapons(readin);
+
         }
+       
 
         #endregion
 
         #region Running
-
-        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, IEnumerable<IMyInventory> requesters)
+        internal void RefreshInventories(List<IMyInventory> providers, List<IMyInventory> requesters)
         {
-            /*if (per_inv * requesters.Count > avaliable.Count) // Sanity check
+            var block_cache = new List<IMyTerminalBlock>();
+            GridTerminalSystem.GetBlocks(block_cache);
+
+            providers.Clear();
+            requesters.Clear();
+
+            foreach(var block in block_cache)
+            {
+                if (block.HasInventory)
+                {
+                    var inv = block.GetInventory();
+                    if (IsWeapon(block))
+                    {
+                        requesters_.Add(inv);
+                    }
+                    providers.Add(inv);
+                }
+            }
+            
+        }
+        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, List<IMyInventory> requesters)
+        {
+            if (per_inv * requesters.Count > avaliable.Count) // Sanity check
             {
                 throw new InvalidOperationException("Not enough avaliable for all requesters, AllotItems called with invalid arguments!");
-            }*/
+            }
 
             var aval_head = 0;
             foreach(var inv in requesters)
@@ -91,7 +185,7 @@ namespace IngameScript
             }
         }
 
-        internal void RebalanceInventories(IEnumerable<IMyInventory> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        internal void RebalanceInventories(List<IMyInventory> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
 
             var total_reqs = requesters_.Count;
@@ -105,30 +199,6 @@ namespace IngameScript
 
         }
 
-        internal static void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
-        {
-            foreach(var item in items)
-            {
-                if (item.Type.TypeId.ToString() == AMMO_TYPE_NAME)
-                {
-                    List<AmmoItemData> target_set;
-                    var key = item.Type.SubtypeId.ToString();
-
-                    var found = true;
-                    if (!readin.TryGetValue(key, out target_set))
-                    {
-                        target_set = new List<AmmoItemData>();
-                        found = false;
-                    }
-
-                    target_set.Add(new AmmoItemData { Item = item, Parent = parent });
-                    if (!found)
-                    {
-                        readin.Add(key, target_set);
-                    }
-                }
-            }
-        }
         internal static void ScanInventories(List<IMyInventory> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
             var items_tmp = new List<MyInventoryItem>();
@@ -145,18 +215,19 @@ namespace IngameScript
         #endregion
         #region Cleanup
 
-        internal static void ClearLists<T, V>(Dictionary<T, List<V>> dict)
-        {
-            foreach (var val in dict.Values)
-            {
-                val.Clear();
-            }
-        }
         #endregion
 
         #region Entry points
         public Program()
         {
+            var wc = new WcPbApi();
+            if (!wc.Activate(Me))
+            {
+                console.Persistout.WriteLn($"Failed to initalise WeaponCore, falling back to vanilla only");
+            } else
+            {
+                ScanForWeapons(wc, wc_weapons_);
+            }
 
         }
 
