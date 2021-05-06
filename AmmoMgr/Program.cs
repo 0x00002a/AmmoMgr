@@ -148,6 +148,13 @@ namespace IngameScript
             return item;
 
         }
+
+        internal static string OwnerName(IMyInventory inv)
+        {
+            var owner = inv?.Owner as IMyTerminalBlock;
+            return owner == null ? "" : owner.CustomName;
+        }
+
         internal void RefreshInventories(List<HashSet<InventoryData>> readin)
         {
             var block_cache = new List<IMyTerminalBlock>();
@@ -190,12 +197,12 @@ namespace IngameScript
                 for (var i = aval_head; i < avaliable.Count; ++i)
                 {
                     var target_item = avaliable[i];
-                    if (target_item.Parent.IsConnectedTo(inv))
+                    if (target_item.Parent.IsConnectedTo(inv) && target_item.Parent != inv)
                     {
                         var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
                         inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-                        actions_log_.Add($"{inv.Owner.DisplayName} ({target_item.Item.Type.SubtypeId}) ({aval})-> {target_item.Parent.Owner.DisplayName}");
+                        actions_log_.Add($"{OwnerName(inv)} ({target_item.Item.Type.SubtypeId}) ({aval}) -> {OwnerName(target_item.Parent)}");
 
                         needed -= aval;
                         if (needed > 0)
