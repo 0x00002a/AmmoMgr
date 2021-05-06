@@ -39,6 +39,9 @@ namespace IngameScript
         internal List<IMyInventory> requesters_ = new List<IMyInventory>();
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
+        internal Dictionary<MyItemType, List<AmmoItemData>> paritioned_aval_ammo_ = new Dictionary<MyItemType, List<AmmoItemData>>();
+
+        internal Dictionary<MyInventoryItem, double> claimed_items_cache_ = new Dictionary<MyInventoryItem, double>();
 
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
 
@@ -97,23 +100,17 @@ namespace IngameScript
                 return wc_weapons_.Contains(id);
             }
         }
-        internal bool CanContainItem(IMyEntity entity, MyInventoryItem ammo)
+        internal bool CanContainItem(IMyInventory inv, MyInventoryItem ammo)
         {
-            if (entity.HasInventory)
+            HashSet<MyItemType> allowed;
+            if (!inv_allowlist_cache_.TryGetValue(inv, out allowed))
             {
-                var inv = entity.GetInventory();
-                HashSet<MyItemType> allowed;
-                if (!inv_allowlist_cache_.TryGetValue(inv, out allowed))
-                {
-                    allowed = new HashSet<MyItemType>();
-                    inv.GetAcceptedItems(null, t => { allowed.Add(t); return false; });
-                    inv_allowlist_cache_.Add(inv, allowed);
-                }
-
-                return allowed.Contains(ammo.Type);
+                allowed = new HashSet<MyItemType>();
+                inv.GetAcceptedItems(null, t => { allowed.Add(t); return false; });
+                inv_allowlist_cache_.Add(inv, allowed);
             }
-            return false;
-            
+
+            return allowed.Contains(ammo.Type);
         }
         #endregion
 
@@ -153,32 +150,41 @@ namespace IngameScript
             }
             
         }
-        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, List<IMyInventory> requesters)
+        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, IEnumerable<IMyInventory> requesters)
         {
-            if (per_inv * requesters.Count > avaliable.Count) // Sanity check
+            /*if (per_inv * requesters.Count > avaliable.Count) // Sanity check
             {
                 throw new InvalidOperationException("Not enough avaliable for all requesters, AllotItems called with invalid arguments!");
-            }
+            }*/
 
+            claimed_items_cache_.Clear();
+            
             var aval_head = 0;
             foreach(var inv in requesters)
             {
                 var needed = per_inv;
-                for (var i = aval_head; i < avaliable.Count; ++i)
+                foreach (var target_item in avaliable)
                 {
-                    var target_item = avaliable[i];
 
-                    var aval = Math.Min(needed, (double)target_item.Item.Amount);
-
-                    inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-
-                    needed -= aval;
-                    if (needed > 0)
+                    var unclaimed_and_usable = CanContainItem(target_item.Parent, target_item.Item)
+                                                && (!claimed_items_cache_.ContainsKey(target_item.Item)
+                                                    || claimed_items_cache_[target_item.Item] == 0);
+                    if (unclaimed_and_usable)
                     {
-                        ++aval_head;
-                    } else
-                    {
-                        break;
+
+                        var aval = Math.Min(needed, (double)target_item.Item.Amount);
+
+                        inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
+
+                        needed -= aval;
+                        if (needed > 0)
+                        {
+                            ++aval_head;
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
 
@@ -251,7 +257,7 @@ namespace IngameScript
             var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
             if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 minutes 
             {
-                RefreshInventories(cached_inventories_);
+                RefreshInventories(cached_inventories_, requesters_);
                 
             } else if (ticks_10 % 3 == 0)
             {
