@@ -43,10 +43,8 @@ namespace IngameScript
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
         internal List<HashSet<InventoryData>> partitioned_invs_ = new List<HashSet<InventoryData>>();
-
-        internal Dictionary<MyInventoryItem, double> claimed_items_cache_ = new Dictionary<MyInventoryItem, double>();
-
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
+        internal List<string> actions_log_ = new List<string>();
 
         internal ulong ticks_10 = 0;
 
@@ -59,11 +57,10 @@ namespace IngameScript
 
         #region Util 
 
-        internal void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
+        internal static void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
         {
             foreach(var item in items)
             {
-                console.Stdout.WriteLn($"ITEMT: {item.Type.TypeId}");
                 if (item.Type.TypeId.ToString() == AMMO_TYPE_NAME)
                 {
                     List<AmmoItemData> target_set;
@@ -136,6 +133,11 @@ namespace IngameScript
         {
             console.Stdout.WriteLn($"Inventories: {partitioned_invs_.Sum(pre =>  pre.Count )}");
 
+            foreach(var act in actions_log_)
+            {
+                console.Stdout.WriteLn(act);
+            }
+
         }
 
         internal InventoryData CreateInvData(IMyInventory inv)
@@ -193,6 +195,7 @@ namespace IngameScript
                         var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
                         inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
+                        actions_log_.Add($"{inv.Owner.DisplayName} ({target_item.Item.Type.SubtypeId}) ({aval})-> {target_item.Parent.Owner.DisplayName}");
 
                         needed -= aval;
                         if (needed > 0)
@@ -216,7 +219,6 @@ namespace IngameScript
 
         internal void RebalanceInventories(List<HashSet<InventoryData>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
-            console.Stdout.WriteLn($"AVAL: {avaliable.Count}");
             foreach (var ammo in avaliable)
             {
                 if (ammo.Value.Count != 0)
@@ -231,7 +233,6 @@ namespace IngameScript
                         var per_inv = total / nb_req;
 
                         var eligible_req = eligable_invs.Where(i => i.Requester).Select(i => i.Inventory);
-                        console.Stdout.WriteLn($"pi: {per_inv}, valc: {ammo.Value.Count}, eg: {inv_system.Count}");
                         AllotItems(per_inv, ammo.Value, eligible_req);
 
                     }
@@ -242,9 +243,8 @@ namespace IngameScript
 
         }
 
-        internal void ScanInventories(List<HashSet<InventoryData>> inventories, Dictionary<string, List<AmmoItemData>> readin)
+        internal static void ScanInventories(List<HashSet<InventoryData>> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
-            console.Stdout.WriteLn($"INVS: {inventories.Count}");
             var items_tmp = new List<MyInventoryItem>();
             foreach(var part in inventories)
             {
@@ -306,6 +306,7 @@ namespace IngameScript
                 
             } else if (ticks_10 % 3 == 0)
             {
+                actions_log_.Clear();
                 ClearLists(avaliability_lookup_);
                 ScanInventories(partitioned_invs_, avaliability_lookup_);
                 RebalanceInventories(partitioned_invs_, avaliability_lookup_);
