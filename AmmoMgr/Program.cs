@@ -39,7 +39,7 @@ namespace IngameScript
         internal List<IMyInventory> requesters_ = new List<IMyInventory>();
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
-        internal Dictionary<MyItemType, List<AmmoItemData>> paritioned_aval_ammo_ = new Dictionary<MyItemType, List<AmmoItemData>>();
+        internal List<IMyInventory> connected_invs_cache_ = new List<IMyInventory>();
 
         internal Dictionary<MyInventoryItem, double> claimed_items_cache_ = new Dictionary<MyInventoryItem, double>();
 
@@ -160,19 +160,21 @@ namespace IngameScript
                 for (var i = aval_head; i < avaliable.Count; ++i)
                 {
                     var target_item = avaliable[i];
-
-                    var aval = Math.Min(needed, (double)target_item.Item.Amount);
-
-                    inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-
-                    needed -= aval;
-                    if (needed > 0)
+                    if (target_item.Parent.IsConnectedTo(inv))
                     {
-                        ++aval_head;
-                    }
-                    else
-                    {
-                        break;
+                        var aval = Math.Min(needed, (double)target_item.Item.Amount);
+
+                        inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
+
+                        needed -= aval;
+                        if (needed > 0)
+                        {
+                            ++aval_head;
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
 
@@ -184,21 +186,21 @@ namespace IngameScript
             return src.Where(i => CanContainItem(i, type));
         }
 
-        internal void RebalanceInventories(List<IMyInventory> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        internal void RebalanceInventories(InvCollection requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
 
-            var total_reqs = requesters_.Count;
+            var total_cache = new Dictionary<IMyInventory, double>();
 
-            foreach(var ammo in avaliable)
+            foreach (var ammo in avaliable)
             {
-                if (ammo.Value.Count != 0) {
-                    var total_aval = ammo.Value.Select(a => (double)a.Item.Amount).Sum();
-                    var per_inv = Math.Floor(total_aval / total_reqs);
 
-                    var req_for_this = FilterByCanContain(requesters, ammo.Value[0].Item.Type);
-                    AllotItems(per_inv, ammo.Value, req_for_this);
-                }
+                //var per_inv = Math.Floor(total_aval / total_reqs);
+
+                var req_for_this = FilterByCanContain(requesters, ammo.Value[0].Item.Type);
+                AllotItems(per_inv, ammo.Value, req_for_this);
+
             }
+        
 
         }
 

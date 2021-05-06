@@ -24,9 +24,35 @@ namespace IngameScript
     {
         /// <summary>
         /// A collection of connected inventories
+        /// <para>Its basically an undirected graph</para>
         /// </summary>
-        public struct InvCollection
+        public class InvCollection
         {
+            public double TotalAvalForFrom(IMyInventory inv, MyItemType item)
+            {
+                double total = 0;
+                foreach(var peer in Inventories)
+                {
+                    if (peer == inv || inv.IsConnectedTo(peer))
+                    {
+                        total += (double)peer.GetItemAmount(item);
+                    }
+                }
+                return total;
+            }
+            public int NBConnectedInventories(IMyInventory inv)
+            {
+                int total = 0;
+                foreach(var peer in Inventories)
+                {
+                    if (peer != inv && inv.IsConnectedTo(peer))
+                    {
+                        ++total;
+                    }
+                }
+                return total;
+            }
+
             public List<IMyInventory> Inventories;
         }
     }
