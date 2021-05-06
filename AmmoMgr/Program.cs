@@ -264,7 +264,10 @@ namespace IngameScript
             } else
             {
                 ScanForWeapons(wc, wc_weapons_);
+                console.Persistout.WriteLn($"Using WeaponCore weapons as well as vanilla");
             }
+
+            Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
 
         }
 
@@ -283,6 +286,7 @@ namespace IngameScript
             if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
             {
                 ++ticks_10;
+
             }
 
             var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
@@ -296,6 +300,8 @@ namespace IngameScript
                 ScanInventories(cached_inventories_, avaliability_lookup_);
                 RebalanceInventories(partitioned_invs_, avaliability_lookup_);
             }
+
+            console.PrintOutput(this);
 
 
         }
