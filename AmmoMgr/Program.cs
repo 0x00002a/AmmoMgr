@@ -100,7 +100,7 @@ namespace IngameScript
                 return wc_weapons_.Contains(id);
             }
         }
-        internal bool CanContainItem(IMyInventory inv, MyInventoryItem ammo)
+        internal bool CanContainItem(IMyInventory inv, MyItemType ammo)
         {
             HashSet<MyItemType> allowed;
             if (!inv_allowlist_cache_.TryGetValue(inv, out allowed))
@@ -110,7 +110,7 @@ namespace IngameScript
                 inv_allowlist_cache_.Add(inv, allowed);
             }
 
-            return allowed.Contains(ammo.Type);
+            return allowed.Contains(ammo);
         }
         #endregion
 
@@ -152,43 +152,36 @@ namespace IngameScript
         }
         internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, IEnumerable<IMyInventory> requesters)
         {
-            /*if (per_inv * requesters.Count > avaliable.Count) // Sanity check
-            {
-                throw new InvalidOperationException("Not enough avaliable for all requesters, AllotItems called with invalid arguments!");
-            }*/
-
-            claimed_items_cache_.Clear();
             
             var aval_head = 0;
             foreach(var inv in requesters)
             {
                 var needed = per_inv;
-                foreach (var target_item in avaliable)
+                for (var i = aval_head; i < avaliable.Count; ++i)
                 {
+                    var target_item = avaliable[i];
 
-                    var unclaimed_and_usable = CanContainItem(target_item.Parent, target_item.Item)
-                                                && (!claimed_items_cache_.ContainsKey(target_item.Item)
-                                                    || claimed_items_cache_[target_item.Item] == 0);
-                    if (unclaimed_and_usable)
+                    var aval = Math.Min(needed, (double)target_item.Item.Amount);
+
+                    inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
+
+                    needed -= aval;
+                    if (needed > 0)
                     {
-
-                        var aval = Math.Min(needed, (double)target_item.Item.Amount);
-
-                        inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-
-                        needed -= aval;
-                        if (needed > 0)
-                        {
-                            ++aval_head;
-                        }
-                        else
-                        {
-                            break;
-                        }
+                        ++aval_head;
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
 
             }
+        }
+
+        internal IEnumerable<IMyInventory> FilterByCanContain(List<IMyInventory> src, MyItemType type)
+        {
+            return src.Where(i => CanContainItem(i, type));
         }
 
         internal void RebalanceInventories(List<IMyInventory> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
@@ -198,9 +191,13 @@ namespace IngameScript
 
             foreach(var ammo in avaliable)
             {
-                var total_aval = ammo.Value.Select(a => (double)a.Item.Amount).Sum();
-                var per_inv = Math.Floor(total_aval / total_reqs);
-                AllotItems(per_inv, ammo.Value, requesters);
+                if (ammo.Value.Count != 0) {
+                    var total_aval = ammo.Value.Select(a => (double)a.Item.Amount).Sum();
+                    var per_inv = Math.Floor(total_aval / total_reqs);
+
+                    var req_for_this = FilterByCanContain(requesters, ammo.Value[0].Item.Type);
+                    AllotItems(per_inv, ammo.Value, req_for_this);
+                }
             }
 
         }
