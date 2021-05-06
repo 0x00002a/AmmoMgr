@@ -28,10 +28,10 @@ namespace IngameScript
         /// </summary>
         public class InvCollection
         {
-            public double TotalAvalForFrom(IMyInventory inv, MyItemType item)
+            public static double TotalAvalForFrom(IMyInventory inv, MyItemType item, List<IMyInventory> inventories)
             {
                 double total = 0;
-                foreach(var peer in Inventories)
+                foreach(var peer in inventories)
                 {
                     if (peer == inv || inv.IsConnectedTo(peer))
                     {

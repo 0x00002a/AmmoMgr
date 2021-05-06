@@ -27,6 +27,11 @@ namespace IngameScript
             public IMyInventory Parent;
             public MyInventoryItem Item;
         }
+        internal struct InventoryData
+        {
+            public bool Requester;
+            public IMyInventory Inventory;
+        }
 
 
         #region Constants
@@ -40,6 +45,7 @@ namespace IngameScript
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
         internal List<IMyInventory> connected_invs_cache_ = new List<IMyInventory>();
+        internal List<HashSet<IMyInventory>> partitioned_invs_ = new List<HashSet<IMyInventory>>();
 
         internal Dictionary<MyInventoryItem, double> claimed_items_cache_ = new Dictionary<MyInventoryItem, double>();
 
@@ -128,24 +134,27 @@ namespace IngameScript
         #endregion
 
         #region Running
-        internal void RefreshInventories(List<IMyInventory> providers, List<IMyInventory> requesters)
+        internal void RefreshInventories(List<HashSet<InventoryData>> readin)
         {
             var block_cache = new List<IMyTerminalBlock>();
             GridTerminalSystem.GetBlocks(block_cache);
 
-            providers.Clear();
-            requesters.Clear();
 
-            foreach(var block in block_cache)
+            var flat_inventories = block_cache.Where(b => b.HasInventory).Select(b => b.GetInventory()).ToList();
+            foreach(var inv in flat_inventories)
             {
-                if (block.HasInventory)
+                if (inv.Owner is IMyTerminalBlock)
                 {
-                    var inv = block.GetInventory();
-                    if (IsWeapon(block))
+                    var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
+
+                    var item = new InventoryData { Inventory = inv, Requester = is_requester };
+
+                    var parition = readin.FirstOrDefault(set => set.Contains(item));
+                    if (parition == null)
                     {
-                        requesters_.Add(inv);
+                        parition = new HashSet<InventoryData>();
                     }
-                    providers.Add(inv);
+                    flat_inventories.Where(i => inv.IsConnectedTo(i)).ForEach(i => parition.Add(i));
                 }
             }
             
@@ -186,21 +195,29 @@ namespace IngameScript
             return src.Where(i => CanContainItem(i, type));
         }
 
-        internal void RebalanceInventories(InvCollection requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        internal void RebalanceInventories(List<HashSet<InventoryData>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
-
-            var total_cache = new Dictionary<IMyInventory, double>();
-
             foreach (var ammo in avaliable)
             {
+                if (ammo.Value.Count != 0)
+                {
 
-                //var per_inv = Math.Floor(total_aval / total_reqs);
+                    foreach (var inv_system in requesters)
+                    {
+                        var ammo_t = ammo.Value[0].Item.Type;
+                        var eligable_invs = inv_system.Where(i => CanContainItem(i.Inventory, ammo_t));
+                        var nb_req = eligable_invs.Count(i => i.Requester);
+                        var total = eligable_invs.Select(i => (double)i.Inventory.GetItemAmount(ammo_t)).Sum();
+                        var per_inv = total / nb_req;
 
-                var req_for_this = FilterByCanContain(requesters, ammo.Value[0].Item.Type);
-                AllotItems(per_inv, ammo.Value, req_for_this);
+                        var eligible_req = eligable_invs.Where(i => i.Requester).Select(i => i.Inventory);
+                        AllotItems(per_inv, ammo.Value, eligible_req);
+
+                    }
+                }
 
             }
-        
+
 
         }
 
