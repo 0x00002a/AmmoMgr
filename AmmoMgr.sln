@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31112.23
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmmoMgr", "AmmoMgr\AmmoMgr.csproj", "{D40950B1-191D-4267-AE72-66E90389F20B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D40950B1-191D-4267-AE72-66E90389F20B}.Debug|x64.ActiveCfg = Debug|x64
+		{D40950B1-191D-4267-AE72-66E90389F20B}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {ABED8430-ABC3-4011-989D-872BBBB6E8BF}
+	EndGlobalSection
+EndGlobal
