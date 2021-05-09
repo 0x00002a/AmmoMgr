@@ -37,11 +37,6 @@ namespace IngameScript
             //TotalAmmoSummary,
             WeaponsSummary,
         }
-        internal struct StatusLCDData
-        {
-            public StatusType DisplayType;
-            public IMyTextSurface Surface;
-        }
 
 
         #region Constants
@@ -55,7 +50,7 @@ namespace IngameScript
         internal List<HashSet<InventoryData>> partitioned_invs_ = new List<HashSet<InventoryData>>();
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
         internal List<string> actions_log_ = new List<string>();
-        internal List<StatusLCDData> status_lcds_ = new List<StatusLCDData>();
+        internal Dictionary<StatusType, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusType, List<IMyTextSurface>>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
@@ -138,7 +133,7 @@ namespace IngameScript
             wc.GetAllCoreWeapons(readin);
 
         }
-        internal void ScanForLCDs(ICollection<StatusLCDData> readin)
+        internal void ScanForLCDs(Dictionary<StatusType, List<IMyTextSurface>> readin)
         {
             var search_str = LCD_STATUS_PREFIX;
 
@@ -162,7 +157,7 @@ namespace IngameScript
         {
             return $"AmmoMgr {index}";
         }
-        internal void ParseStatusLCDData(IMyTerminalBlock block, IMyTextSurfaceProvider prov, ICollection<StatusLCDData> readin)
+        internal void ParseStatusLCDData(IMyTerminalBlock block, IMyTextSurfaceProvider prov, Dictionary<StatusType, List<IMyTextSurface>> readin)
         {
             status_lcd_parser_.Clear();
             if (block.CustomData.Length != 0 && !status_lcd_parser_.TryParse(content: block.CustomData))
@@ -181,12 +176,13 @@ namespace IngameScript
                         console.Stderr.WriteLn("Invalid value for enum type");
                         continue;
                     }
-                    var data = new StatusLCDData
+                    List<IMyTextSurface> surfaces = null;
+                    if (!readin.TryGetValue(type, out surfaces))
                     {
-                        DisplayType = type,
-                        Surface = prov.GetSurface(i),
-                    };
-                    readin.Add(data);
+                        surfaces = new List<IMyTextSurface>();
+                        readin.Add(type, surfaces);
+                    }
+                    surfaces.Add(prov.GetSurface(i));
                 }
             }
             
@@ -373,7 +369,10 @@ namespace IngameScript
         {
             if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
             {
-                status_lcds_.Clear();
+                foreach(var surf in status_lcds_)
+                {
+                    surf.Value.Clear();
+                }
                 ScanForLCDs(status_lcds_);
             }
 
@@ -407,31 +406,30 @@ namespace IngameScript
         #region LCD Drawing 
         internal void DrawStatus()
         {
-            for (var i = 0; i != status_lcds_.Count; ++i)
+            foreach (var kh in status_lcds_)
             {
-                var lcd = status_lcds_[i];
-                DrawStatusFor(ref lcd);
+                DrawStatusFor(kh.Key, kh.Value);
             }
         }
 
-        internal void DrawStatusFor(ref StatusLCDData lcd)
+        internal void DrawStatusFor(StatusType type, List<IMyTextSurface> surfaces)
         {
             lcd_data_cache_.Clear();
-            AppendTxtFor(lcd.DisplayType, lcd_data_cache_);
-            
+            AppendTxtFor(type, lcd_data_cache_);
 
-            var sprite = new MySprite
+            foreach (var surface in surfaces)
             {
-                Type = SpriteType.TEXT,
-                Data = lcd_data_cache_.ToString(),
-                Color = Color.White,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            var frame = lcd.Surface.DrawFrame();
-            frame.Add(sprite);
-
-
+                var sprite = new MySprite
+                {
+                    Type = SpriteType.TEXT,
+                    Data = lcd_data_cache_.ToString(),
+                    Color = Color.White,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                };
+                var frame = surface.DrawFrame();
+                frame.Add(sprite);
+            }
 
             lcd_data_cache_.Clear();
         }
