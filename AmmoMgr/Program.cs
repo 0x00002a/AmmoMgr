@@ -27,11 +27,7 @@ namespace IngameScript
             public IMyInventory Parent;
             public MyInventoryItem Item;
         }
-        internal class InventoryData
-        {
-            public bool Requester;
-            public IMyInventory Inventory;
-        }
+        
         internal enum StatusType
         {
             //TotalAmmoSummary,
@@ -42,13 +38,14 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.2.2";
+        internal const string VERSION = "0.3.0";
         #endregion
 
         #region Fields
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
-        internal List<HashSet<InventoryData>> partitioned_invs_ = new List<HashSet<InventoryData>>();
+        internal List<HashSet<IMyInventory>> partitioned_invs_ = new List<HashSet<IMyInventory>>();
+        internal Dictionary<IMyInventory, bool> requester_cache_ = new Dictionary<IMyInventory, bool>();
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
         internal List<string> actions_log_ = new List<string>();
         internal Dictionary<StatusType, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusType, List<IMyTextSurface>>();
@@ -123,6 +120,16 @@ namespace IngameScript
             }
 
             return allowed.Contains(ammo);
+        }
+
+        internal bool IsRequester(IMyInventory inv)
+        {
+            bool result;
+            if (!requester_cache_.TryGetValue(inv, out result))
+            {
+                result = false;
+            }
+            return result;
         }
         #endregion
 
@@ -222,12 +229,12 @@ namespace IngameScript
 
         }
 
-        internal InventoryData CreateInvData(IMyInventory inv)
+        internal IMyInventory CreateInvData(IMyInventory inv)
         {
             var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
 
-            var item = new InventoryData { Inventory = inv, Requester = is_requester };
-            return item;
+            requester_cache_[inv] = is_requester;
+            return inv;
 
         }
 
@@ -237,7 +244,7 @@ namespace IngameScript
             return owner == null ? "" : owner.CustomName;
         }
 
-        internal void RefreshInventories(List<HashSet<InventoryData>> readin)
+        internal void RefreshInventories(List<HashSet<IMyInventory>> readin)
         {
             var block_cache = new List<IMyTerminalBlock>();
             GridTerminalSystem.GetBlocks(block_cache);
@@ -252,7 +259,7 @@ namespace IngameScript
                     var parition = readin.FirstOrDefault(set => set.Contains(item));
                     if (parition == null)
                     {
-                        parition = new HashSet<InventoryData>();
+                        parition = new HashSet<IMyInventory>();
                         readin.Add(parition);
                     }
                     foreach(var peer in flat_inventories)
@@ -306,7 +313,7 @@ namespace IngameScript
             return src.Where(i => CanContainItem(i, type));
         }
 
-        internal void RebalanceInventories(List<HashSet<InventoryData>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        internal void RebalanceInventories(List<HashSet<IMyInventory>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
             foreach (var ammo in avaliable)
             {
@@ -316,12 +323,12 @@ namespace IngameScript
                     foreach (var inv_system in requesters)
                     {
                         var ammo_t = ammo.Value[0].Item.Type;
-                        var eligable_invs = inv_system.Where(i => CanContainItem(i.Inventory, ammo_t));
-                        var nb_req = eligable_invs.Count(i => i.Requester);
-                        var total = eligable_invs.Select(i => (double)i.Inventory.GetItemAmount(ammo_t)).Sum();
+                        var eligable_invs = inv_system.Where(i => CanContainItem(i, ammo_t));
+                        var nb_req = eligable_invs.Count(i => IsRequester(i));
+                        var total = eligable_invs.Select(i => (double)i.GetItemAmount(ammo_t)).Sum();
                         var per_inv = total / nb_req;
 
-                        var eligible_req = eligable_invs.Where(i => i.Requester).Select(i => i.Inventory);
+                        var eligible_req = eligable_invs.Where(i => IsRequester(i));
                         AllotItems(per_inv, ammo.Value, eligible_req);
 
                     }
@@ -332,7 +339,7 @@ namespace IngameScript
 
         }
 
-        internal static void ScanInventories(List<HashSet<InventoryData>> inventories, Dictionary<string, List<AmmoItemData>> readin)
+        internal static void ScanInventories(List<HashSet<IMyInventory>> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
             var items_tmp = new List<MyInventoryItem>();
             foreach(var part in inventories)
@@ -340,9 +347,9 @@ namespace IngameScript
                 foreach (var inv in part)
                 {
                     items_tmp.Clear();
-                    inv.Inventory.GetItems(items_tmp);
+                    inv.GetItems(items_tmp);
 
-                    SortItems(inv.Inventory, items_tmp, readin);
+                    SortItems(inv, items_tmp, readin);
                 }
 
             }
@@ -357,13 +364,17 @@ namespace IngameScript
 
             foreach(var parition in partitioned_invs_)
             {
-                foreach(var inv_data in parition)
+                foreach(var inv in parition)
                 {
-                    var inv_parent = inv_data.Inventory.Owner as IMyTerminalBlock;
-                    if (inv_data.Requester || IsWeapon(inv_parent))
+                    var inv_parent = inv.Owner as IMyTerminalBlock;
+                    if (inv_parent != null && (IsRequester(inv) || IsWeapon(inv_parent)))
                     {
                         var curr_target = wc_.GetWeaponTarget(inv_parent);
-                        inv_data.Requester = curr_target == null || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0);
+
+                        requester_cache_[inv] = !wc_.IsWeaponReadyToFire(inv_parent) 
+                                            || !(curr_target == null 
+                                            || curr_target.Value.EntityId == 0
+                                            || wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0));
                     }
 
                 }
@@ -493,21 +504,21 @@ namespace IngameScript
             {
                 foreach (var wep in wep_group)
                 {
-                    if (wep.Requester)
+                    if (IsRequester(wep))
                     {
                         HashSet<MyItemType> accepted;
-                        if (inv_allowlist_cache_.TryGetValue(wep.Inventory, out accepted))
+                        if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
                         {
-                            to.Append($"[ {(wep.Inventory.Owner as IMyTerminalBlock)?.CustomName} ]\n");
-                            var aval = wep.Inventory.MaxVolume;
+                            to.Append($"[ {(wep.Owner as IMyTerminalBlock)?.CustomName} ]\n");
+                            var aval = wep.MaxVolume;
 
                             to.Append("  ");
-                            DrawProgressBar(to, 5, (double)wep.Inventory.CurrentVolume, (double)aval);
+                            DrawProgressBar(to, 5, (double)wep.CurrentVolume, (double)aval);
                             to.Append("\n");
 
                             foreach (var accept in accepted)
                             {
-                                var qty = wep.Inventory.GetItemAmount(accept);
+                                var qty = wep.GetItemAmount(accept);
                                 if (qty > 0)
                                 {
                                     to.Append($"    > {accept.SubtypeId}: {qty}\n");
