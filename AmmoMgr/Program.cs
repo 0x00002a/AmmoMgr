@@ -27,7 +27,7 @@ namespace IngameScript
             public IMyInventory Parent;
             public MyInventoryItem Item;
         }
-        internal struct InventoryData
+        internal class InventoryData
         {
             public bool Requester;
             public IMyInventory Inventory;
@@ -55,6 +55,7 @@ namespace IngameScript
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
+        internal WcPbApi wc_;
 
         internal ulong ticks_10 = 0;
 
@@ -347,6 +348,31 @@ namespace IngameScript
             }
         }
 
+        internal void RefreshTargetingStatus()
+        {
+            if (wc_ == null)
+            {
+                return;
+            }
+
+            foreach(var parition in partitioned_invs_)
+            {
+                foreach(var inv_data in parition)
+                {
+                    var inv_parent = inv_data.Inventory.Owner as IMyTerminalBlock;
+                    if (inv_data.Requester || IsWeapon(inv_parent))
+                    {
+                        var curr_target = wc_.GetWeaponTarget(inv_parent);
+                        inv_data.Requester = curr_target == null || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0);
+                    }
+
+                }
+
+            }
+
+
+        }
+
         #endregion
         #region Cleanup
 
@@ -362,6 +388,7 @@ namespace IngameScript
             } else
             {
                 ScanForWeapons(wc, wc_weapons_);
+                wc_ = wc;
                 console.Persistout.WriteLn($"Using WeaponCore weapons as well as vanilla");
             }
             ScanForLCDs(status_lcds_);
@@ -385,11 +412,11 @@ namespace IngameScript
         {
             if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
             {
-                /*foreach(var surf in status_lcds_)
+                foreach(var surf in status_lcds_)
                 {
                     surf.Value.Clear();
                 }
-                ScanForLCDs(status_lcds_);*/
+                ScanForLCDs(status_lcds_);
             }
 
             if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
@@ -397,6 +424,7 @@ namespace IngameScript
                 ++ticks_10;
 
                 DrawStatus();
+                RefreshTargetingStatus();
             }
 
             var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
