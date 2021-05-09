@@ -625,7 +625,9 @@ namespace IngameScript
                     if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
 
+                        console.Stdout.WriteLn($"POS: {sbuilder_.CurrPos}");
                         to.Add(sbuilder_.MakeText($"[ {owner_block.CustomName} ]"));
+                        console.Stdout.WriteLn($"POS: {sbuilder_.CurrPos}");
 
 
                         sbuilder_.AddNewline();
@@ -641,7 +643,7 @@ namespace IngameScript
 
 
                         sbuilder_.AddNewline();
-                        using (var _ = sbuilder_.WithIndent(20))
+                        using (var idn1 = sbuilder_.WithIndent(20))
                         {
                             HashSet<MyItemType> accepted;
                             if (inv_allowlist_cache_.TryGetValue(wep, out accepted))

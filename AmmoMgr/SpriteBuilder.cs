@@ -24,7 +24,7 @@ namespace IngameScript
     {
         public class SpriteBuilder
         {
-            internal struct IndentProxy: IDisposable {
+            public struct IndentProxy: IDisposable {
                 internal SpriteBuilder parent_;
                 internal int by_;
                 internal IndentProxy(SpriteBuilder parent, int by)
@@ -64,6 +64,7 @@ namespace IngameScript
             public void MakeProgressBar(ref MySpriteDrawFrame to, Vector2 size, Color bg, Color fg, double curr, double total)
             {
                 var padding = new Vector2(2, 2);
+                size = size * Scale;
 
                 var bg_rect = new RectangleF(CurrPos, size);
 
@@ -116,7 +117,7 @@ namespace IngameScript
                     RotationOrScale = Scale,
                     FontId = font_id,
                     Color = color ?? Color.White,
-                    Position = CurrPos + offset,
+                    Position = CurrPos + roffset,
                 };
             }
 
