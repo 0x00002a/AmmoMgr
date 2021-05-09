@@ -46,7 +46,7 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.1.1";
+        internal const string VERSION = "0.2.1";
         #endregion
 
         #region Fields
@@ -153,15 +153,7 @@ namespace IngameScript
                     var name = block.CustomName;
                     if (name.Contains(search_str))
                     {
-                        var prefix_end = name.IndexOf(search_str) + search_str.Length - 1;
-                        var search_end = name.IndexOf(" ", prefix_end);
-                        if (search_end == -1)
-                        {
-                            search_end = name.Length;
-                        }
-                        var sub = name.Substring(prefix_end, search_end);
-                        var type = (StatusType)Enum.Parse(typeof(StatusType), sub, ignoreCase: true);
-
+                        ParseStatusLCDData(block, prov, readin);
                     }
                 }
             }
