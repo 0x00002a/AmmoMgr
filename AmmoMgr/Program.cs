@@ -286,12 +286,17 @@ namespace IngameScript
                 for (var i = aval_head; i < avaliable.Count; ++i)
                 {
                     var target_item = avaliable[i];
-                    if (target_item.Parent.IsConnectedTo(inv) && target_item.Parent != inv)
+                    var from_inv = target_item.Parent;
+                    if (
+                        ((double)inv.GetItemAmount(target_item.Item.Type) < per_inv)
+                        &&
+                        from_inv.IsConnectedTo(inv) 
+                        && (!IsRequester(from_inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) >= 2 * per_inv))
                     {
                         var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
                         inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-                        actions_log_.Add($"{OwnerName(inv)} ({target_item.Item.Type.SubtypeId}) ({aval}) -> {OwnerName(target_item.Parent)}");
+                        actions_log_.Add($"{OwnerName(target_item.Parent)} -> {OwnerName(inv)} ({target_item.Item.Type.SubtypeId}) ({aval}) ");
 
                         needed -= aval;
                         if (needed > 0)
@@ -463,7 +468,6 @@ namespace IngameScript
         {
             foreach (var kh in status_lcds_)
             {
-                console.Stdout.WriteLn($"{kh.Key} => {kh.Value}");
                 DrawStatusFor(kh.Key, kh.Value);
             }
         }
