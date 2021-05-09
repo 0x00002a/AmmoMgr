@@ -34,6 +34,11 @@ namespace IngameScript
             WeaponsSummary,
             Invalid,
         }
+        internal struct StatusLCDData
+        {
+            public StatusType Type;
+            public string Group;
+        }
 
 
         #region Constants
@@ -48,11 +53,14 @@ namespace IngameScript
         internal Dictionary<IMyInventory, int> requester_cache_ = new Dictionary<IMyInventory, int>();
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
         internal List<string> actions_log_ = new List<string>();
-        internal Dictionary<StatusType, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusType, List<IMyTextSurface>>();
+        internal Dictionary<StatusLCDData, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusLCDData, List<IMyTextSurface>>();
+        internal Dictionary<string, HashSet<IMyTerminalBlock>> block_groups_cache_ = new Dictionary<string, HashSet<IMyTerminalBlock>>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
         internal WcPbApi wc_;
+
+        Exception fatal_error_ = null;
 
         internal ulong ticks_10 = 0;
 
@@ -168,7 +176,7 @@ namespace IngameScript
             wc.GetAllCoreWeapons(readin);
 
         }
-        internal void ScanForLCDs(Dictionary<StatusType, List<IMyTextSurface>> readin)
+        internal void ScanForLCDs(Dictionary<StatusLCDData, List<IMyTextSurface>> readin)
         {
             var search_str = LCD_STATUS_PREFIX;
 
@@ -205,7 +213,7 @@ namespace IngameScript
                     return false;
             }
         }
-        internal void ParseStatusLCDData(IMyTerminalBlock block, IMyTextSurfaceProvider prov, Dictionary<StatusType, List<IMyTextSurface>> readin)
+        internal void ParseStatusLCDData(IMyTerminalBlock block, IMyTextSurfaceProvider prov, Dictionary<StatusLCDData, List<IMyTextSurface>> readin)
         {
             status_lcd_parser_.Clear();
             if (block.CustomData.Length != 0 && !status_lcd_parser_.TryParse(content: block.CustomData))
@@ -221,11 +229,15 @@ namespace IngameScript
                 {
                     StatusType type;
                     TryParseStatus(status_lcd_parser_.Get(sect, "type").ToString(), out type);
+                    var group = status_lcd_parser_.Get(sect, "group").ToString(null);
+
+                    var data = new StatusLCDData { Group = group, Type = type };
+
                     List<IMyTextSurface> surfaces;
-                    if (!readin.TryGetValue(type, out surfaces))
+                    if (!readin.TryGetValue(data, out surfaces))
                     {
                         surfaces = new List<IMyTextSurface>();
-                        readin.Add(type, surfaces);
+                        readin.Add(data, surfaces);
                     }
                     surfaces.Add(prov.GetSurface(i));
                 } else
@@ -240,6 +252,17 @@ namespace IngameScript
 
         }
 
+        internal void ScanGroups()
+        {
+            block_groups_cache_.Clear();
+            GridTerminalSystem.GetBlockGroups(null, g => {
+                var set = new HashSet<IMyTerminalBlock>();
+                g.GetBlocks(null, b => { set.Add(b); return false; });
+                block_groups_cache_.Add(g.Name, set); 
+                
+                
+                return false; });
+        }
 
         #endregion
 
@@ -442,6 +465,7 @@ namespace IngameScript
                 console.Persistout.WriteLn($"Using WeaponCore weapons as well as vanilla");
             }
             ScanForLCDs(status_lcds_);
+            ScanGroups();
             
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
@@ -460,41 +484,59 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
-            if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
+            if (fatal_error_ != null)
             {
-                foreach(var surf in status_lcds_)
+                console.Stderr.WriteLn($"== Fatal Error ==\nReason: {fatal_error_.Message}\n\n-- Stack Trace --\n{fatal_error_.StackTrace}");
+            }
+            else
+            {
+
+                try
                 {
-                    surf.Value.Clear();
+                    if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
+                    {
+                        foreach (var surf in status_lcds_)
+                        {
+                            surf.Value.Clear();
+                        }
+                        ScanForLCDs(status_lcds_);
+                    }
+
+                    if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
+                    {
+                        ++ticks_10;
+
+                        DrawStatus();
+                        RefreshTargetingStatus();
+                    }
+
+                    var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
+                    if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 minutes 
+                    {
+                        RefreshInventories(partitioned_invs_);
+
+                    }
+                    else if (ticks_10 % 3 == 0)
+                    {
+                        actions_log_.Clear();
+                        ClearLists(avaliability_lookup_);
+                        ScanInventories(partitioned_invs_, avaliability_lookup_);
+                        RebalanceInventories(partitioned_invs_, avaliability_lookup_);
+                    }
+
+                    WriteStatsToStdout();
                 }
-                ScanForLCDs(status_lcds_);
+                catch (Exception e)
+                {
+                    fatal_error_ = e;
+                    Runtime.UpdateFrequency = UpdateFrequency.Once | UpdateFrequency.Update100;
+                }
             }
 
-            if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
-            {
-                ++ticks_10;
-
-                DrawStatus();
-                RefreshTargetingStatus();
-            }
-
-            var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
-            if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 minutes 
-            {
-                RefreshInventories(partitioned_invs_);
-                
-            } else if (ticks_10 % 3 == 0)
-            {
-                actions_log_.Clear();
-                ClearLists(avaliability_lookup_);
-                ScanInventories(partitioned_invs_, avaliability_lookup_);
-                RebalanceInventories(partitioned_invs_, avaliability_lookup_);
-            }
-
-            WriteStatsToStdout();
             console.PrintOutput(this);
 
-
         }
+
         #endregion
 
         #region LCD Drawing 
@@ -502,14 +544,14 @@ namespace IngameScript
         {
             foreach (var kh in status_lcds_)
             {
-                DrawStatusFor(kh.Key, kh.Value);
+                DrawStatusFor(kh.Key.Type, kh.Key.Group, kh.Value);
             }
         }
 
-        internal void DrawStatusFor(StatusType type, List<IMyTextSurface> surfaces)
+        internal void DrawStatusFor(StatusType type, string group_filter, List<IMyTextSurface> surfaces)
         {
             lcd_data_cache_.Clear();
-            AppendTxtFor(type, lcd_data_cache_);
+            AppendTxtFor(type, group_filter, lcd_data_cache_);
 
             foreach (var surface in surfaces)
             {
@@ -537,14 +579,20 @@ namespace IngameScript
             }
             to.Append(")");
         }
-        internal void AppendForWepSummary(StringBuilder to)
+        internal void AppendForWepSummary(StringBuilder to, string filter_group_name)
         {
+            HashSet<IMyTerminalBlock> filter_group = null;
+            if (filter_group_name != null)
+            {
+                block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
+            }
+
             foreach (var wep_group in partitioned_invs_)
             {
                 foreach (var wep in wep_group)
                 {
                     var owner_block = wep.Owner as IMyTerminalBlock;
-                    if (owner_block != null && IsWeapon(owner_block))
+                    if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
                         to.Append($"[ {owner_block.CustomName} ]\n");
                         var aval = wep.MaxVolume;
@@ -572,12 +620,12 @@ namespace IngameScript
                 }
             }
         }
-        internal void AppendTxtFor(StatusType data, StringBuilder to)
+        internal void AppendTxtFor(StatusType data, string filter, StringBuilder to)
         {
             switch(data)
             {
                 case StatusType.WeaponsSummary:
-                    AppendForWepSummary(to);
+                    AppendForWepSummary(to, filter);
                     break;
                 case StatusType.Invalid:
                     to.Append("Invalid custom data");
