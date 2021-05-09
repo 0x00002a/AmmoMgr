@@ -555,8 +555,24 @@ namespace IngameScript
 
             foreach (var surface in surfaces)
             {
-                surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                surface.WriteText(lcd_data_cache_.ToString());
+                surface.ContentType = ContentType.SCRIPT;
+                surface.Script = string.Empty;
+                var viewport = new RectangleF((surface.TextureSize - surface.SurfaceSize), surface.SurfaceSize);
+                var pos = viewport.Position;
+                var sprite = new MySprite
+                {
+                    Type = SpriteType.TEXT,
+                    Data = lcd_data_cache_.ToString(),
+                    RotationOrScale = 0.8f,
+                    Color = Color.White,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                };
+                var frame = surface.DrawFrame();
+                frame.Add(sprite);
+                frame.Dispose();
+
+                //surface.WriteText(lcd_data_cache_);
             }
 
             lcd_data_cache_.Clear();
