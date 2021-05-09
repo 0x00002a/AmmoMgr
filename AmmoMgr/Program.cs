@@ -38,6 +38,7 @@ namespace IngameScript
         {
             public StatusType Type;
             public string Group;
+            public Vector2 OriginOffset;
             public Vector2 ScrollOffset;
         }
 
@@ -232,8 +233,11 @@ namespace IngameScript
                     StatusType type;
                     TryParseStatus(status_lcd_parser_.Get(sect, "type").ToString(), out type);
                     var group = status_lcd_parser_.Get(sect, "group").ToString(null);
+                    var offset_x = status_lcd_parser_.Get(sect, "offset x").ToInt32(0);
+                    var offset_y = status_lcd_parser_.Get(sect, "offset y").ToInt32(0);
+                    var origin_offset = new Vector2(offset_x, offset_y);
 
-                    var data = new StatusLCDData { Group = group, Type = type };
+                    var data = new StatusLCDData { Group = group, Type = type, OriginOffset = origin_offset  };
 
                     List<IMyTextSurface> surfaces;
                     if (!readin.TryGetValue(data, out surfaces))
@@ -558,7 +562,7 @@ namespace IngameScript
             {
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = string.Empty;
-                var viewport = new RectangleF(new Vector2(0, (surface.TextureSize.Y - surface.SurfaceSize.Y) / 2f), surface.SurfaceSize);
+                var viewport = new RectangleF(new Vector2(0, (surface.TextureSize.Y - surface.SurfaceSize.Y) / 2f) + data.OriginOffset, surface.SurfaceSize);
                 var pos = viewport.Position + data.ScrollOffset;
 
                 var frame = surface.DrawFrame();
@@ -576,8 +580,7 @@ namespace IngameScript
                 {
                     data.ScrollOffset = Vector2.Zero;
                 }
-                console.Stdout.WriteLn($"OFFSET: {data.ScrollOffset}");
-                console.Stdout.WriteLn($"SIZE: {viewport}");
+
 
                 frame.Dispose();
 
