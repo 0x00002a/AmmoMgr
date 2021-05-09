@@ -283,6 +283,7 @@ namespace IngameScript
                 ScanForWeapons(wc, wc_weapons_);
                 console.Persistout.WriteLn($"Using WeaponCore weapons as well as vanilla");
             }
+            
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
 
