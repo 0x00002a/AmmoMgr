@@ -32,6 +32,16 @@ namespace IngameScript
             public bool Requester;
             public IMyInventory Inventory;
         }
+        internal enum StatusType
+        {
+            //TotalAmmoSummary,
+            WeaponsSummary,
+        }
+        internal struct StatusLCDData
+        {
+            public StatusType DisplayType;
+            public IMyTextSurface Surface;
+        }
 
 
         #region Constants
@@ -45,6 +55,9 @@ namespace IngameScript
         internal List<HashSet<InventoryData>> partitioned_invs_ = new List<HashSet<InventoryData>>();
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
         internal List<string> actions_log_ = new List<string>();
+        internal List<StatusLCDData> status_lcds_ = new List<StatusLCDData>();
+        internal StringBuilder lcd_data_cache_ = new StringBuilder();
+        internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
 
         internal ulong ticks_10 = 0;
 
@@ -122,6 +135,33 @@ namespace IngameScript
             wc.GetAllCoreStaticLaunchers(readin);
             wc.GetAllCoreTurrets(readin);
             wc.GetAllCoreWeapons(readin);
+
+        }
+        internal void ScanForLCDs(ICollection<StatusLCDData> readin)
+        {
+            var search_str = LCD_STATUS_PREFIX;
+
+            var blocks_tmp = new List<IMyTerminalBlock>();
+            GridTerminalSystem.GetBlocks(blocks_tmp);
+
+            foreach(var block in blocks_tmp)
+            {
+                var name = block.CustomName;
+                if (block.)
+                if (name.Contains(search_str))
+                {
+                    var prefix_end = name.IndexOf(search_str) + search_str.Length - 1;
+                    var search_end = name.IndexOf(" ", prefix_end);
+                    if (search_end == -1)
+                    {
+                        search_end = name.Length;
+                    }
+                    var sub = name.Substring(prefix_end, search_end);
+                    var type = (StatusType)Enum.Parse(typeof(StatusType), sub, ignoreCase: true);
+
+                }
+            }
+
 
         }
 
@@ -325,6 +365,65 @@ namespace IngameScript
 
 
         }
+        #endregion
+
+        #region LCD Drawing 
+        internal void DrawStatus()
+        {
+            for (var i = 0; i != status_lcds_.Count; ++i)
+            {
+                var lcd = status_lcds_[i];
+                DrawStatusFor(ref lcd);
+            }
+        }
+
+        internal void DrawStatusFor(ref StatusLCDData lcd)
+        {
+            lcd_data_cache_.Clear();
+            AppendTxtFor(lcd.DisplayType, lcd_data_cache_);
+            
+
+            var sprite = new MySprite
+            {
+                Type = SpriteType.TEXT,
+                Data = lcd_data_cache_.ToString(),
+                Color = Color.White,
+                Alignment = TextAlignment.CENTER,
+                FontId = "White",
+            };
+            var frame = lcd.Surface.DrawFrame();
+            frame.Add(sprite);
+
+
+
+            lcd_data_cache_.Clear();
+        }
+        internal void AppendTxtFor(StatusType data, StringBuilder to)
+        {
+            switch(data)
+            {
+                case StatusType.WeaponsSummary:
+                    foreach(var wep_group in partitioned_invs_)
+                    {
+                        foreach(var wep in wep_group)
+                        {
+                            var accepted = inv_allowlist_cache_[wep.Inventory];
+                            to.Append($"=[{(wep.Inventory.Owner as IMyTerminalBlock)?.CustomName}]=");
+                            foreach(var accept in accepted)
+                            {
+                                var qty = wep.Inventory.GetItemAmount(accept);
+                                if (qty > 0)
+                                {
+                                    to.Append($"- {accept.SubtypeId}: {qty}");
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+            }
+        }
+
         #endregion
     }
 }
