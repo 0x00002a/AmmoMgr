@@ -59,6 +59,7 @@ namespace IngameScript
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
         internal WcPbApi wc_;
+        const float NEWLINE_HEIGHT = 37;
 
         Exception fatal_error_ = null;
 
@@ -571,27 +572,47 @@ namespace IngameScript
         }
         internal static void DrawProgressBar(ref MySpriteDrawFrame to, Vector2 start_pos, double curr, double total)
         {
-            const float width = 0.5f;
+            const float width = NEWLINE_HEIGHT * 4;
+            const float height = 2 * (NEWLINE_HEIGHT / 3);
+            var padding = new Vector2(2, 2);
+
+            var bg_rect = new RectangleF(start_pos, new Vector2(width, height));
+
             var sprite = new MySprite
             {
                 Type = SpriteType.TEXTURE,
-                Data = "Square",
-                Position = start_pos,
-                Color = Color.White,
-                Alignment = TextAlignment.LEFT,
-                Size = new Vector2(width, 0.1f),
+                Data = "SquareSimple",
+                Position = bg_rect.Center,
+                Color = Color.White.Alpha(0.8f),
+                Alignment = TextAlignment.CENTER,
+                Size = bg_rect.Size,
             };
             to.Add(sprite);
+
+            var fg_rect = new RectangleF(start_pos + padding / 2, new Vector2((float)(curr * (width / total)), height) - padding);
+
             sprite = new MySprite
             {
                 Type = SpriteType.TEXTURE,
-                Data = "Square",
-                Position = start_pos,
-                Color = Color.Blue,
+                Data = "SquareSimple",
+                Position = fg_rect.Center,
+                Color = Color.BlueViolet,
                 Alignment = TextAlignment.CENTER,
-                Size = new Vector2((float)(curr * (width / total)), 0.1f),
+                Size = fg_rect.Size,
             };
             to.Add(sprite);
+            var txt_rect = new RectangleF(bg_rect.Position + new Vector2(bg_rect.Size.X + 5, 0), new Vector2(90, 0));
+            to.Add(new MySprite
+            {
+                Type = SpriteType.TEXT,
+                Color = Color.White,
+                FontId = "White",
+                Alignment = TextAlignment.CENTER,
+                Position = txt_rect.Center,
+                RotationOrScale = 1f,
+                Data = $"{Math.Round(curr / total * 100)}%"
+            }
+            );
         }
         internal static MySprite MakeTxtSprite(Vector2? pos, string text)
         {
@@ -600,9 +621,19 @@ namespace IngameScript
                 Type = SpriteType.TEXT,
                 Data = text,
                 Position = pos,
+                RotationOrScale = 1f,
+                Color = Color.White,
                 FontId = "White",
                 Alignment = TextAlignment.LEFT,
             };
+        }
+        internal static void OffsetNewline(ref Vector2 vec)
+        {
+            vec.Y += NEWLINE_HEIGHT;
+        }
+        internal static void OffsetIndent(ref Vector2 vec)
+        {
+            vec.X += 10;
         }
         internal void AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name, Vector2 start_pos)
         {
@@ -613,6 +644,7 @@ namespace IngameScript
             }
 
             var curr_pos = start_pos;
+            var start_x = curr_pos.X;
             foreach (var wep_group in partitioned_invs_)
             {
                 foreach (var wep in wep_group)
@@ -621,15 +653,15 @@ namespace IngameScript
                     if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
                         to.Add(MakeTxtSprite(curr_pos, $"[ {owner_block.CustomName} ]"));
-                        curr_pos.Y += 0.2f;
-                        curr_pos.X += 0.4f;
+                        
 
                         var aval = wep.MaxVolume;
+                        OffsetNewline(ref curr_pos);
 
                         DrawProgressBar(ref to, curr_pos, (double)wep.CurrentVolume, (double)aval);
 
-                        curr_pos.Y += 0.2f;
-                        curr_pos.X += 0.4f;
+                        OffsetIndent(ref curr_pos);
+                        OffsetNewline(ref curr_pos);
 
                         HashSet<MyItemType> accepted;
                         if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
@@ -641,12 +673,17 @@ namespace IngameScript
                                 {
                                     to.Add(MakeTxtSprite(curr_pos, $"    > {accept.SubtypeId}: {qty}"));
                                 }
-                                curr_pos.Y += 0.2f;
+
+                                OffsetNewline(ref curr_pos);
                             }
                         } else
                         {
                             to.Add(MakeTxtSprite(curr_pos, ("    > DRY")));
+                            OffsetNewline(ref curr_pos);
                         }
+
+                        OffsetNewline(ref curr_pos);
+                        curr_pos.X = start_x;
                     }
                 }
             }
