@@ -39,13 +39,40 @@ namespace IngameScript
                     parent_.CurrPos.X -= by_;
                 }
             }
+            public struct BoxedProxy {
+                internal SpriteBuilder parent_;
+                internal Vector2 origin_;
+                public BoxedProxy(SpriteBuilder parent)
+                {
+                    parent_ = parent;
+                    origin_ = parent.CurrPos;
+                }
+
+                public MySprite Make(int width)
+                {
+                    var size = new RectangleF(origin_, new Vector2( width, parent_.CurrPos.Y - origin_.Y));
+                    return new MySprite
+                    {
+                        Type = SpriteType.TEXT,
+                        Data = "SquareHollow",
+                        Size = size.Size,
+                        Position = size.Center,
+                        Alignment = TextAlignment.CENTER,
+                        Color = Color.Red,
+                    };
+
+                }
+            }
             
 
             public float Scale;
             public RectangleF Viewport;
             public Vector2 CurrPos;
             public Vector2 Origin;
+            public IMyTextSurface Surface;
             public float NEWLINE_HEIGHT => newline_height_base * Scale;
+
+            internal StringBuilder str_cache_ = new StringBuilder();
 
             internal float newline_height_base = 37f;
 
@@ -62,6 +89,20 @@ namespace IngameScript
             {
                 CurrPos.Y += NEWLINE_HEIGHT;
             }
+            public MySprite MakeBulletPt(Color? fg = null)
+            {
+                var color = fg ?? Color.White;
+                var bounds = new RectangleF(CurrPos, new Vector2(NEWLINE_HEIGHT / 3, NEWLINE_HEIGHT / 3));
+                return new MySprite
+                {
+                    Data = "CircleHollow",
+                    Type = SpriteType.TEXTURE,
+                    Color = color,
+                    Alignment = TextAlignment.CENTER,
+                    Position = bounds.Center,
+                    Size = bounds.Size,
+                };
+            }
 
             public void MakeProgressBar(ref MySpriteDrawFrame to, Vector2 size, Color bg, Color fg, double curr, double total)
             {
@@ -73,7 +114,7 @@ namespace IngameScript
                 var sprite = new MySprite
                 {
                     Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
+                    Data = "SquareTapered",
                     Position = bg_rect.Center,
                     Color = bg,
                     Alignment = TextAlignment.CENTER,
@@ -96,25 +137,27 @@ namespace IngameScript
                 var txt_rect = new RectangleF(bg_rect.Position + new Vector2(bg_rect.Size.X + 5, 0), new Vector2(90, 0));
                 to.Add(MakeText(
                     txt: $"{curr / total * 100:00}%",
-                    offset: new Vector2(bg_rect.Size.X + NEWLINE_HEIGHT * 3, bg_rect.Size.Y / 4),
-                    alignment: TextAlignment.CENTER
+                    offset: new Vector2(bg_rect.Size.X + NEWLINE_HEIGHT, bg_rect.Size.Y / 4)
                     )
                 );
 
             }
 
-            public MySprite MakeText(string txt, TextAlignment alignment = TextAlignment.LEFT, Color? color = null, string font_id = "White", Vector2? offset = null)
+            public MySprite MakeText(string txt, Color? color = null, string font_id = "White", Vector2? offset = null)
             {
                 var roffset = offset ?? Vector2.Zero;
+                str_cache_.Clear();
+                str_cache_.Append(txt);
+                var bounding_rect = new RectangleF(CurrPos + roffset, Surface.MeasureStringInPixels(str_cache_, font_id, Scale));
                 return new MySprite
                 {
                     Type = SpriteType.TEXT,
                     Data = txt,
-                    Alignment = alignment,
+                    Alignment = TextAlignment.LEFT,
                     RotationOrScale = Scale,
                     FontId = font_id,
                     Color = color ?? Color.White,
-                    Position = CurrPos + roffset,
+                    Position = bounding_rect.Center,
                 };
             }
 

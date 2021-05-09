@@ -573,6 +573,7 @@ namespace IngameScript
                 sbuilder_.CurrPos = pos;
                 sbuilder_.Scale = data.Scale;
                 sbuilder_.Viewport = viewport;
+                sbuilder_.Surface = surface;
 
                 var end_pos = AppendTxtFor(data.Type, data.Group, ref frame);
 
@@ -614,9 +615,8 @@ namespace IngameScript
                     if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
 
-                        console.Stdout.WriteLn($"POS: {sbuilder_.CurrPos}");
+                        var box_border = new SpriteBuilder.BoxedProxy(sbuilder_);
                         to.Add(sbuilder_.MakeText($"[ {owner_block.CustomName} ]"));
-                        console.Stdout.WriteLn($"POS: {sbuilder_.CurrPos}");
 
 
                         sbuilder_.AddNewline();
@@ -642,18 +642,16 @@ namespace IngameScript
                                     var qty = wep.GetItemAmount(accept);
                                     if (qty > 0)
                                     {
-                                        to.Add(sbuilder_.MakeText($"> {accept.SubtypeId}: {qty}"));
+                                        to.Add(sbuilder_.MakeBulletPt());
+                                        sbuilder_.CurrPos.X += sbuilder_.NEWLINE_HEIGHT;
+                                        to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {qty}"));
                                     }
 
                                     sbuilder_.AddNewline();
                                 }
                             }
-                            else
-                            {
-                                to.Add(sbuilder_.MakeText(("> DRY")));
-                                sbuilder_.AddNewline();
-                            }
                             sbuilder_.AddNewline();
+                            to.Add(box_border.Make((int)sbuilder_.Viewport.Size.X));
                         }
 
                     }
