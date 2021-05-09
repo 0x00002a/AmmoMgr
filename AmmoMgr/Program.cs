@@ -276,7 +276,7 @@ namespace IngameScript
             }
             
         }
-        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, IEnumerable<IMyInventory> requesters)
+        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, HashSet<IMyInventory> requesters)
         {
             
             var aval_head = 0;
@@ -287,10 +287,13 @@ namespace IngameScript
                 {
                     var target_item = avaliable[i];
                     var from_inv = target_item.Parent;
+                    var to_block = inv.Owner as IMyTerminalBlock;
                     if (
-                        ((double)inv.GetItemAmount(target_item.Item.Type) < per_inv)
-                        &&
-                        from_inv.IsConnectedTo(inv) 
+                        CanContainItem(inv, target_item.Item.Type)
+                        && (to_block != null && to_block.IsWorking)
+                        && IsRequester(inv) 
+                        && ((double)inv.GetItemAmount(target_item.Item.Type) < per_inv)
+                        && from_inv.IsConnectedTo(inv) 
                         && (!IsRequester(from_inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) > per_inv))
                     {
                         var aval = Math.Min(needed, (double)target_item.Item.Amount);
@@ -333,8 +336,7 @@ namespace IngameScript
                         var total = eligable_invs.Select(i => (double)i.GetItemAmount(ammo_t)).Sum();
                         var per_inv = total / nb_req;
 
-                        var eligible_req = eligable_invs.Where(i => IsRequester(i));
-                        AllotItems(per_inv, ammo.Value, eligible_req);
+                        AllotItems(per_inv, ammo.Value, inv_system);
 
                     }
                 }
