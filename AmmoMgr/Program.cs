@@ -557,15 +557,16 @@ namespace IngameScript
             {
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = string.Empty;
-                var viewport = new RectangleF((surface.TextureSize - surface.SurfaceSize), surface.SurfaceSize);
+                var viewport = new RectangleF(new Vector2(0, surface.TextureSize.Y - surface.SurfaceSize.Y), surface.SurfaceSize);
                 var pos = viewport.Position;
                 var sprite = new MySprite
                 {
                     Type = SpriteType.TEXT,
                     Data = lcd_data_cache_.ToString(),
+                    Position = pos,
                     RotationOrScale = 0.8f,
                     Color = Color.White,
-                    Alignment = TextAlignment.CENTER,
+                    Alignment = TextAlignment.LEFT,
                     FontId = "White",
                 };
                 var frame = surface.DrawFrame();
