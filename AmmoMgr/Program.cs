@@ -291,7 +291,7 @@ namespace IngameScript
                         ((double)inv.GetItemAmount(target_item.Item.Type) < per_inv)
                         &&
                         from_inv.IsConnectedTo(inv) 
-                        && (!IsRequester(from_inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) >= 2 * per_inv))
+                        && (!IsRequester(from_inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) > per_inv))
                     {
                         var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
@@ -376,10 +376,14 @@ namespace IngameScript
                     {
                         var curr_target = wc_.GetWeaponTarget(inv_parent);
 
-                        requester_cache_[inv] = !wc_.IsWeaponReadyToFire(inv_parent) 
-                                            || !(curr_target == null 
+                        var is_requester = !wc_.IsWeaponReadyToFire(inv_parent)
+                                            || !(curr_target == null
                                             || curr_target.Value.EntityId == 0
-                                            || wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0));
+                                            || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0));
+
+                        console.Stdout.WriteLn($"{inv_parent.CustomName}: {is_requester}");
+
+                        requester_cache_[inv] = is_requester;
                     }
 
                 }
