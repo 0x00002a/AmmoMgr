@@ -58,6 +58,7 @@ namespace IngameScript
         internal List<StatusLCDData> status_lcds_ = new List<StatusLCDData>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
+        internal MyIni status_lcd_parser_ = new MyIni();
 
         internal ulong ticks_10 = 0;
 
@@ -141,26 +142,62 @@ namespace IngameScript
         {
             var search_str = LCD_STATUS_PREFIX;
 
-            var blocks_tmp = new List<IMyTerminalBlock>();
-            GridTerminalSystem.GetBlocks(blocks_tmp);
+            var blocks_tmp = new List<IMyTextSurfaceProvider>();
+            GridTerminalSystem.GetBlocksOfType(blocks_tmp);
 
-            foreach(var block in blocks_tmp)
+            foreach (var prov in blocks_tmp)
             {
-                var name = block.CustomName;
-                if (block.)
-                if (name.Contains(search_str))
+                var block = prov as IMyTerminalBlock;
+                if (block != null)
                 {
-                    var prefix_end = name.IndexOf(search_str) + search_str.Length - 1;
-                    var search_end = name.IndexOf(" ", prefix_end);
-                    if (search_end == -1)
+                    var name = block.CustomName;
+                    if (name.Contains(search_str))
                     {
-                        search_end = name.Length;
-                    }
-                    var sub = name.Substring(prefix_end, search_end);
-                    var type = (StatusType)Enum.Parse(typeof(StatusType), sub, ignoreCase: true);
+                        var prefix_end = name.IndexOf(search_str) + search_str.Length - 1;
+                        var search_end = name.IndexOf(" ", prefix_end);
+                        if (search_end == -1)
+                        {
+                            search_end = name.Length;
+                        }
+                        var sub = name.Substring(prefix_end, search_end);
+                        var type = (StatusType)Enum.Parse(typeof(StatusType), sub, ignoreCase: true);
 
+                    }
                 }
             }
+        }
+        internal string BuildStatusLCDSectionName(int index)
+        {
+            return $"AmmoMgr {index}";
+        }
+        internal void ParseStatusLCDData(IMyTerminalBlock block, IMyTextSurfaceProvider prov, ICollection<StatusLCDData> readin)
+        {
+            status_lcd_parser_.Clear();
+            if (block.CustomData.Length != 0 && !status_lcd_parser_.TryParse(content: block.CustomData))
+            {
+                console.Persistout.WriteLn($"{block.CustomName} has invalid custom data");
+                return;
+            }
+            for(var i = 0; i != prov.SurfaceCount; ++i)
+            {
+                var sect = BuildStatusLCDSectionName(i);
+
+                if (status_lcd_parser_.ContainsSection(sect))
+                {
+                    StatusType type;
+                    if (!Enum.TryParse(status_lcd_parser_.Get(sect, "type").ToString(), out type)){
+                        console.Stderr.WriteLn("Invalid value for enum type");
+                        continue;
+                    }
+                    var data = new StatusLCDData
+                    {
+                        DisplayType = type,
+                        Surface = prov.GetSurface(i),
+                    };
+                    readin.Add(data);
+                }
+            }
+            
 
 
         }
@@ -323,6 +360,7 @@ namespace IngameScript
                 ScanForWeapons(wc, wc_weapons_);
                 console.Persistout.WriteLn($"Using WeaponCore weapons as well as vanilla");
             }
+            ScanForLCDs(status_lcds_);
             
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
@@ -341,10 +379,17 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
+            if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
+            {
+                status_lcds_.Clear();
+                ScanForLCDs(status_lcds_);
+            }
+
             if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
             {
                 ++ticks_10;
 
+                DrawStatus();
             }
 
             var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
