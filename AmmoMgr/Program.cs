@@ -551,7 +551,6 @@ namespace IngameScript
         internal void DrawStatusFor(StatusType type, string group_filter, List<IMyTextSurface> surfaces)
         {
             lcd_data_cache_.Clear();
-            AppendTxtFor(type, group_filter, lcd_data_cache_);
 
             foreach (var surface in surfaces)
             {
@@ -559,18 +558,10 @@ namespace IngameScript
                 surface.Script = string.Empty;
                 var viewport = new RectangleF(new Vector2(0, surface.TextureSize.Y - surface.SurfaceSize.Y), surface.SurfaceSize);
                 var pos = viewport.Position;
-                var sprite = new MySprite
-                {
-                    Type = SpriteType.TEXT,
-                    Data = lcd_data_cache_.ToString(),
-                    Position = pos,
-                    RotationOrScale = 0.8f,
-                    Color = Color.White,
-                    Alignment = TextAlignment.LEFT,
-                    FontId = "White",
-                };
+
                 var frame = surface.DrawFrame();
-                frame.Add(sprite);
+                AppendTxtFor(type, group_filter, ref frame, pos);
+               
                 frame.Dispose();
 
                 //surface.WriteText(lcd_data_cache_);
@@ -578,25 +569,42 @@ namespace IngameScript
 
             lcd_data_cache_.Clear();
         }
-        internal static void DrawProgressBar(StringBuilder to, int steps, double curr, double total)
+        internal static void DrawProgressBar(ref MySpriteDrawFrame to, Vector2 start_pos, double curr, double total)
         {
-            to.Append("(");
-            var seg_size = total / steps;
-            for(var s = 0; s < steps; ++s)
+            const float width = 0.5f;
+            var sprite = new MySprite
             {
-                var seg = seg_size * s;
-                if (seg > curr || curr == 0)
-                {
-                    to.Append("-");
-                } else
-                {
-                    to.Append("=");
-                }
-
-            }
-            to.Append(")");
+                Type = SpriteType.TEXTURE,
+                Data = "Square",
+                Position = start_pos,
+                Color = Color.White,
+                Alignment = TextAlignment.LEFT,
+                Size = new Vector2(width, 0.1f),
+            };
+            to.Add(sprite);
+            sprite = new MySprite
+            {
+                Type = SpriteType.TEXTURE,
+                Data = "Square",
+                Position = start_pos,
+                Color = Color.Blue,
+                Alignment = TextAlignment.CENTER,
+                Size = new Vector2((float)(curr * (width / total)), 0.1f),
+            };
+            to.Add(sprite);
         }
-        internal void AppendForWepSummary(StringBuilder to, string filter_group_name)
+        internal static MySprite MakeTxtSprite(Vector2? pos, string text)
+        {
+            return new MySprite
+            {
+                Type = SpriteType.TEXT,
+                Data = text,
+                Position = pos,
+                FontId = "White",
+                Alignment = TextAlignment.LEFT,
+            };
+        }
+        internal void AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name, Vector2 start_pos)
         {
             HashSet<IMyTerminalBlock> filter_group = null;
             if (filter_group_name != null)
@@ -604,6 +612,7 @@ namespace IngameScript
                 block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
             }
 
+            var curr_pos = start_pos;
             foreach (var wep_group in partitioned_invs_)
             {
                 foreach (var wep in wep_group)
@@ -611,12 +620,16 @@ namespace IngameScript
                     var owner_block = wep.Owner as IMyTerminalBlock;
                     if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
-                        to.Append($"[ {owner_block.CustomName} ]\n");
+                        to.Add(MakeTxtSprite(curr_pos, $"[ {owner_block.CustomName} ]"));
+                        curr_pos.Y += 0.2f;
+                        curr_pos.X += 0.4f;
+
                         var aval = wep.MaxVolume;
 
-                        to.Append("  ");
-                        DrawProgressBar(to, 5, (double)wep.CurrentVolume, (double)aval);
-                        to.Append("\n");
+                        DrawProgressBar(ref to, curr_pos, (double)wep.CurrentVolume, (double)aval);
+
+                        curr_pos.Y += 0.2f;
+                        curr_pos.X += 0.4f;
 
                         HashSet<MyItemType> accepted;
                         if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
@@ -626,26 +639,27 @@ namespace IngameScript
                                 var qty = wep.GetItemAmount(accept);
                                 if (qty > 0)
                                 {
-                                    to.Append($"    > {accept.SubtypeId}: {qty}\n");
+                                    to.Add(MakeTxtSprite(curr_pos, $"    > {accept.SubtypeId}: {qty}"));
                                 }
+                                curr_pos.Y += 0.2f;
                             }
                         } else
                         {
-                            to.Append("    > DRY");
+                            to.Add(MakeTxtSprite(curr_pos, ("    > DRY")));
                         }
                     }
                 }
             }
         }
-        internal void AppendTxtFor(StatusType data, string filter, StringBuilder to)
+        internal void AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to, Vector2 start)
         {
             switch(data)
             {
                 case StatusType.WeaponsSummary:
-                    AppendForWepSummary(to, filter);
+                    AppendForWepSummary(ref to, filter, start);
                     break;
                 case StatusType.Invalid:
-                    to.Append("Invalid custom data");
+                    //to.Append("Invalid custom data");
                     break;
             }
         }
