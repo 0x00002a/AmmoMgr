@@ -336,6 +336,8 @@ namespace IngameScript
                         var total = eligable_invs.Select(i => (double)i.GetItemAmount(ammo_t)).Sum();
                         var per_inv = total / nb_req;
 
+                        per_inv = Math.Floor(Math.Round(per_inv, 1));
+
                         AllotItems(per_inv, ammo.Value, inv_system);
 
                     }
@@ -378,12 +380,13 @@ namespace IngameScript
                     {
                         var curr_target = wc_.GetWeaponTarget(inv_parent);
 
-                        var is_requester = !wc_.IsWeaponReadyToFire(inv_parent)
-                                            || !(curr_target == null
-                                            || curr_target.Value.EntityId == 0
-                                            || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0));
 
-                        console.Stdout.WriteLn($"{inv_parent.CustomName}: {is_requester}");
+                        var is_requester =!(
+                                            curr_target == null
+                                            || curr_target.Value.EntityId == 0
+                                            || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0)
+                                           );
+
 
                         requester_cache_[inv] = is_requester;
                     }
