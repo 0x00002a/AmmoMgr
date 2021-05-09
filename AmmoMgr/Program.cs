@@ -436,22 +436,28 @@ namespace IngameScript
             foreach (var surface in surfaces)
             {
                 surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                //surface.Script = "";
                 surface.WriteText(lcd_data_cache_.ToString());
-                /*
-                var sprite = new MySprite
-                {
-                    Type = SpriteType.TEXT,
-                    Data = lcd_data_cache_.ToString(),
-                    Color = Color.White,
-                    Alignment = TextAlignment.CENTER,
-                    FontId = "White",
-                };
-                var frame = surface.DrawFrame();
-                frame.Add(sprite);*/
             }
 
             lcd_data_cache_.Clear();
+        }
+        internal static void DrawProgressBar(StringBuilder to, int steps, double curr, double total)
+        {
+            to.Append("(");
+            var seg_size = total / steps;
+            for(var s = 0; s < steps; ++s)
+            {
+                var seg = seg_size * s;
+                if (seg > curr || curr == 0)
+                {
+                    to.Append("-");
+                } else
+                {
+                    to.Append("=");
+                }
+
+            }
+            to.Append(")");
         }
         internal void AppendForWepSummary(StringBuilder to)
         {
@@ -459,16 +465,25 @@ namespace IngameScript
             {
                 foreach (var wep in wep_group)
                 {
-                    HashSet<MyItemType> accepted;
-                    if (inv_allowlist_cache_.TryGetValue(wep.Inventory, out accepted))
+                    if (wep.Requester)
                     {
-                        to.Append($"=[{(wep.Inventory.Owner as IMyTerminalBlock)?.CustomName}]=\n");
-                        foreach (var accept in accepted)
+                        HashSet<MyItemType> accepted;
+                        if (inv_allowlist_cache_.TryGetValue(wep.Inventory, out accepted))
                         {
-                            var qty = wep.Inventory.GetItemAmount(accept);
-                            if (qty > 0)
+                            to.Append($"[ {(wep.Inventory.Owner as IMyTerminalBlock)?.CustomName} ]\n");
+                            var aval = wep.Inventory.MaxVolume;
+
+                            to.Append("  ");
+                            DrawProgressBar(to, 5, (double)wep.Inventory.CurrentVolume, (double)aval);
+                            to.Append("\n");
+
+                            foreach (var accept in accepted)
                             {
-                                to.Append($"- {accept.SubtypeId}: {qty}\n");
+                                var qty = wep.Inventory.GetItemAmount(accept);
+                                if (qty > 0)
+                                {
+                                    to.Append($"    > {accept.SubtypeId}: {qty}\n");
+                                }
                             }
                         }
                     }
