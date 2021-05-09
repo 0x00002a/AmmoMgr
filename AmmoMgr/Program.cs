@@ -34,10 +34,11 @@ namespace IngameScript
             WeaponsSummary,
             Invalid,
         }
-        internal struct StatusLCDData
+        internal class StatusLCDData
         {
             public StatusType Type;
             public string Group;
+            public Vector2 ScrollOffset;
         }
 
 
@@ -545,11 +546,11 @@ namespace IngameScript
         {
             foreach (var kh in status_lcds_)
             {
-                DrawStatusFor(kh.Key.Type, kh.Key.Group, kh.Value);
+                DrawStatusFor(kh.Key, kh.Value);
             }
         }
 
-        internal void DrawStatusFor(StatusType type, string group_filter, List<IMyTextSurface> surfaces)
+        internal void DrawStatusFor(StatusLCDData data, List<IMyTextSurface> surfaces)
         {
             lcd_data_cache_.Clear();
 
@@ -557,12 +558,27 @@ namespace IngameScript
             {
                 surface.ContentType = ContentType.SCRIPT;
                 surface.Script = string.Empty;
-                var viewport = new RectangleF(new Vector2(0, surface.TextureSize.Y - surface.SurfaceSize.Y), surface.SurfaceSize);
-                var pos = viewport.Position;
+                var viewport = new RectangleF(new Vector2(0, (surface.TextureSize.Y - surface.SurfaceSize.Y) / 2f), surface.SurfaceSize);
+                var pos = viewport.Position + data.ScrollOffset;
 
                 var frame = surface.DrawFrame();
-                AppendTxtFor(type, group_filter, ref frame, pos);
-               
+                var end_pos = AppendTxtFor(data.Type, data.Group, ref frame, pos);
+
+                if (end_pos.Y < viewport.Position.Y)
+                {
+                    data.ScrollOffset -= new Vector2(0, 100);
+                }
+                else if (viewport.Position.Y + viewport.Size.Y < end_pos.Y)
+                {
+                    data.ScrollOffset -= new Vector2(0, 10);
+                }
+                else
+                {
+                    data.ScrollOffset = Vector2.Zero;
+                }
+                console.Stdout.WriteLn($"OFFSET: {data.ScrollOffset}");
+                console.Stdout.WriteLn($"SIZE: {viewport}");
+
                 frame.Dispose();
 
                 //surface.WriteText(lcd_data_cache_);
@@ -635,7 +651,7 @@ namespace IngameScript
         {
             vec.X += 10;
         }
-        internal void AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name, Vector2 start_pos)
+        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name, Vector2 start_pos)
         {
             HashSet<IMyTerminalBlock> filter_group = null;
             if (filter_group_name != null)
@@ -687,18 +703,19 @@ namespace IngameScript
                     }
                 }
             }
+            return curr_pos;
         }
-        internal void AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to, Vector2 start)
+        internal Vector2 AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to, Vector2 start)
         {
-            switch(data)
+            switch (data)
             {
                 case StatusType.WeaponsSummary:
-                    AppendForWepSummary(ref to, filter, start);
-                    break;
+                    return AppendForWepSummary(ref to, filter, start);
                 case StatusType.Invalid:
                     //to.Append("Invalid custom data");
-                    break;
+                    return Vector2.Zero;
             }
+            return Vector2.Zero;
         }
 
         #endregion
