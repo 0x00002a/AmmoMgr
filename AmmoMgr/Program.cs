@@ -36,12 +36,13 @@ namespace IngameScript
         {
             //TotalAmmoSummary,
             WeaponsSummary,
+            Invalid,
         }
 
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.2.1";
+        internal const string VERSION = "0.2.2";
         #endregion
 
         #region Fields
@@ -157,6 +158,19 @@ namespace IngameScript
         {
             return $"AmmoMgr {index}";
         }
+        internal bool TryParseStatus(string input, out StatusType output)
+        {
+            switch(input)
+            {
+                case "WeaponsSummary":
+                case "WepSummary":
+                    output = StatusType.WeaponsSummary;
+                    return true;
+                default:
+                    output = StatusType.Invalid;
+                    return false;
+            }
+        }
         internal void ParseStatusLCDData(IMyTerminalBlock block, IMyTextSurfaceProvider prov, Dictionary<StatusType, List<IMyTextSurface>> readin)
         {
             status_lcd_parser_.Clear();
@@ -172,19 +186,21 @@ namespace IngameScript
                 if (status_lcd_parser_.ContainsSection(sect))
                 {
                     StatusType type;
-                    if (!Enum.TryParse(status_lcd_parser_.Get(sect, "type").ToString(), out type)){
-                        console.Stderr.WriteLn("Invalid value for enum type");
-                        continue;
-                    }
-                    List<IMyTextSurface> surfaces = null;
+                    TryParseStatus(status_lcd_parser_.Get(sect, "type").ToString(), out type);
+                    List<IMyTextSurface> surfaces;
                     if (!readin.TryGetValue(type, out surfaces))
                     {
                         surfaces = new List<IMyTextSurface>();
                         readin.Add(type, surfaces);
                     }
                     surfaces.Add(prov.GetSurface(i));
+                } else
+                {
+                    status_lcd_parser_.AddSection(sect);
                 }
             }
+            block.CustomData = status_lcd_parser_.ToString();
+
             
 
 
@@ -369,11 +385,11 @@ namespace IngameScript
         {
             if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
             {
-                foreach(var surf in status_lcds_)
+                /*foreach(var surf in status_lcds_)
                 {
                     surf.Value.Clear();
                 }
-                ScanForLCDs(status_lcds_);
+                ScanForLCDs(status_lcds_);*/
             }
 
             if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
@@ -419,6 +435,10 @@ namespace IngameScript
 
             foreach (var surface in surfaces)
             {
+                surface.ContentType = ContentType.TEXT_AND_IMAGE;
+                //surface.Script = "";
+                surface.WriteText(lcd_data_cache_.ToString());
+                /*
                 var sprite = new MySprite
                 {
                     Type = SpriteType.TEXT,
@@ -428,34 +448,43 @@ namespace IngameScript
                     FontId = "White",
                 };
                 var frame = surface.DrawFrame();
-                frame.Add(sprite);
+                frame.Add(sprite);*/
             }
 
             lcd_data_cache_.Clear();
+        }
+        internal void AppendForWepSummary(StringBuilder to)
+        {
+            foreach (var wep_group in partitioned_invs_)
+            {
+                foreach (var wep in wep_group)
+                {
+                    HashSet<MyItemType> accepted;
+                    if (inv_allowlist_cache_.TryGetValue(wep.Inventory, out accepted))
+                    {
+                        to.Append($"=[{(wep.Inventory.Owner as IMyTerminalBlock)?.CustomName}]=\n");
+                        foreach (var accept in accepted)
+                        {
+                            var qty = wep.Inventory.GetItemAmount(accept);
+                            if (qty > 0)
+                            {
+                                to.Append($"- {accept.SubtypeId}: {qty}\n");
+                            }
+                        }
+                    }
+                }
+            }
         }
         internal void AppendTxtFor(StatusType data, StringBuilder to)
         {
             switch(data)
             {
                 case StatusType.WeaponsSummary:
-                    foreach(var wep_group in partitioned_invs_)
-                    {
-                        foreach(var wep in wep_group)
-                        {
-                            var accepted = inv_allowlist_cache_[wep.Inventory];
-                            to.Append($"=[{(wep.Inventory.Owner as IMyTerminalBlock)?.CustomName}]=");
-                            foreach(var accept in accepted)
-                            {
-                                var qty = wep.Inventory.GetItemAmount(accept);
-                                if (qty > 0)
-                                {
-                                    to.Append($"- {accept.SubtypeId}: {qty}");
-                                }
-                            }
-                        }
-                    }
+                    AppendForWepSummary(to);
                     break;
-
+                case StatusType.Invalid:
+                    to.Append("Invalid custom data");
+                    break;
             }
         }
 
