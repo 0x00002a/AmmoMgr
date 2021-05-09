@@ -239,8 +239,9 @@ namespace IngameScript
                     var offset_x = status_lcd_parser_.Get(sect, "offset x").ToInt32(0);
                     var offset_y = status_lcd_parser_.Get(sect, "offset y").ToInt32(0);
                     var origin_offset = new Vector2(offset_x, offset_y);
+                    var scale = status_lcd_parser_.Get(sect, "scale").ToDouble(1);
 
-                    var data = new StatusLCDData { Group = group, Type = type, OriginOffset = origin_offset  };
+                    var data = new StatusLCDData { Group = group, Type = type, OriginOffset = origin_offset, Scale = (float)scale  };
 
                     List<IMyTextSurface> surfaces;
                     if (!readin.TryGetValue(data, out surfaces))
@@ -596,19 +597,7 @@ namespace IngameScript
 
             lcd_data_cache_.Clear();
         }
-        internal static MySprite MakeTxtSprite(Vector2? pos, string text, float scale)
-        {
-            return new MySprite
-            {
-                Type = SpriteType.TEXT,
-                Data = text,
-                Position = pos,
-                RotationOrScale = 1f,
-                Color = Color.White,
-                FontId = "White",
-                Alignment = TextAlignment.LEFT,
-            };
-        }
+        
         internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name)
         {
             HashSet<IMyTerminalBlock> filter_group = null;

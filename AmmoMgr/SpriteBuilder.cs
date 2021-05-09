@@ -45,7 +45,9 @@ namespace IngameScript
             public RectangleF Viewport;
             public Vector2 CurrPos;
             public Vector2 Origin;
-            public float NEWLINE_HEIGHT = 37f;
+            public float NEWLINE_HEIGHT => newline_height_base * Scale;
+
+            internal float newline_height_base = 37f;
 
             public IndentProxy WithIndent(int by)
             {
@@ -64,7 +66,7 @@ namespace IngameScript
             public void MakeProgressBar(ref MySpriteDrawFrame to, Vector2 size, Color bg, Color fg, double curr, double total)
             {
                 var padding = new Vector2(2, 2);
-                size = size * Scale;
+                size *= Scale;
 
                 var bg_rect = new RectangleF(CurrPos, size);
 
@@ -92,16 +94,11 @@ namespace IngameScript
                 };
                 to.Add(sprite);
                 var txt_rect = new RectangleF(bg_rect.Position + new Vector2(bg_rect.Size.X + 5, 0), new Vector2(90, 0));
-                to.Add(new MySprite
-                {
-                    Type = SpriteType.TEXT,
-                    Color = Color.White,
-                    FontId = "White",
-                    Alignment = TextAlignment.CENTER,
-                    Position = txt_rect.Center,
-                    RotationOrScale = 1f,
-                    Data = $"{Math.Round(curr / total * 100)}%"
-                }
+                to.Add(MakeText(
+                    txt: $"{curr / total * 100:00}%",
+                    offset: new Vector2(bg_rect.Size.X + NEWLINE_HEIGHT * 3, bg_rect.Size.Y / 4),
+                    alignment: TextAlignment.CENTER
+                    )
                 );
 
             }
