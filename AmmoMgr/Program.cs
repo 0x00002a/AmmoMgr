@@ -40,6 +40,7 @@ namespace IngameScript
             public string Group;
             public Vector2 OriginOffset;
             public Vector2 ScrollOffset;
+            public float Scale = 1f;
         }
 
 
@@ -61,7 +62,9 @@ namespace IngameScript
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
         internal WcPbApi wc_;
-        const float NEWLINE_HEIGHT = 37;
+        internal SpriteBuilder sbuilder_ = new SpriteBuilder();
+
+
 
         Exception fatal_error_ = null;
 
@@ -566,7 +569,11 @@ namespace IngameScript
                 var pos = viewport.Position + data.ScrollOffset;
 
                 var frame = surface.DrawFrame();
-                var end_pos = AppendTxtFor(data.Type, data.Group, ref frame, pos);
+                sbuilder_.CurrPos = pos;
+                sbuilder_.Scale = data.Scale;
+                sbuilder_.Viewport = viewport;
+
+                var end_pos = AppendTxtFor(data.Type, data.Group, ref frame);
 
                 if (end_pos.Y < viewport.Position.Y)
                 {
@@ -580,60 +587,16 @@ namespace IngameScript
                 {
                     data.ScrollOffset = Vector2.Zero;
                 }
+                console.Stdout.WriteLn($"BOX: {viewport}");
 
 
                 frame.Dispose();
 
-                //surface.WriteText(lcd_data_cache_);
             }
 
             lcd_data_cache_.Clear();
         }
-        internal static void DrawProgressBar(ref MySpriteDrawFrame to, Vector2 start_pos, double curr, double total)
-        {
-            const float width = NEWLINE_HEIGHT * 4;
-            const float height = 2 * (NEWLINE_HEIGHT / 3);
-            var padding = new Vector2(2, 2);
-
-            var bg_rect = new RectangleF(start_pos, new Vector2(width, height));
-
-            var sprite = new MySprite
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = bg_rect.Center,
-                Color = Color.White.Alpha(0.8f),
-                Alignment = TextAlignment.CENTER,
-                Size = bg_rect.Size,
-            };
-            to.Add(sprite);
-
-            var fg_rect = new RectangleF(start_pos + padding / 2, new Vector2((float)(curr * (width / total)), height) - padding);
-
-            sprite = new MySprite
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = fg_rect.Center,
-                Color = Color.BlueViolet,
-                Alignment = TextAlignment.CENTER,
-                Size = fg_rect.Size,
-            };
-            to.Add(sprite);
-            var txt_rect = new RectangleF(bg_rect.Position + new Vector2(bg_rect.Size.X + 5, 0), new Vector2(90, 0));
-            to.Add(new MySprite
-            {
-                Type = SpriteType.TEXT,
-                Color = Color.White,
-                FontId = "White",
-                Alignment = TextAlignment.CENTER,
-                Position = txt_rect.Center,
-                RotationOrScale = 1f,
-                Data = $"{Math.Round(curr / total * 100)}%"
-            }
-            );
-        }
-        internal static MySprite MakeTxtSprite(Vector2? pos, string text)
+        internal static MySprite MakeTxtSprite(Vector2? pos, string text, float scale)
         {
             return new MySprite
             {
@@ -646,15 +609,7 @@ namespace IngameScript
                 Alignment = TextAlignment.LEFT,
             };
         }
-        internal static void OffsetNewline(ref Vector2 vec)
-        {
-            vec.Y += NEWLINE_HEIGHT;
-        }
-        internal static void OffsetIndent(ref Vector2 vec)
-        {
-            vec.X += 10;
-        }
-        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name, Vector2 start_pos)
+        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name)
         {
             HashSet<IMyTerminalBlock> filter_group = null;
             if (filter_group_name != null)
@@ -662,8 +617,6 @@ namespace IngameScript
                 block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
             }
 
-            var curr_pos = start_pos;
-            var start_x = curr_pos.X;
             foreach (var wep_group in partitioned_invs_)
             {
                 foreach (var wep in wep_group)
@@ -671,49 +624,58 @@ namespace IngameScript
                     var owner_block = wep.Owner as IMyTerminalBlock;
                     if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
-                        to.Add(MakeTxtSprite(curr_pos, $"[ {owner_block.CustomName} ]"));
-                        
 
+                        to.Add(sbuilder_.MakeText($"[ {owner_block.CustomName} ]"));
+
+
+                        sbuilder_.AddNewline();
                         var aval = wep.MaxVolume;
-                        OffsetNewline(ref curr_pos);
 
-                        DrawProgressBar(ref to, curr_pos, (double)wep.CurrentVolume, (double)aval);
+                        sbuilder_.MakeProgressBar(
+                            to: ref to, 
+                            size: new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (sbuilder_.NEWLINE_HEIGHT / 3)), 
+                            bg: Color.White, 
+                            fg: Color.BlueViolet,
+                            curr: (double)wep.CurrentVolume, total: (double)aval
+                            );
 
-                        OffsetIndent(ref curr_pos);
-                        OffsetNewline(ref curr_pos);
 
-                        HashSet<MyItemType> accepted;
-                        if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
+                        sbuilder_.AddNewline();
+                        using (var _ = sbuilder_.WithIndent(20))
                         {
-                            foreach (var accept in accepted)
+                            HashSet<MyItemType> accepted;
+                            if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
                             {
-                                var qty = wep.GetItemAmount(accept);
-                                if (qty > 0)
+                                foreach (var accept in accepted)
                                 {
-                                    to.Add(MakeTxtSprite(curr_pos, $"    > {accept.SubtypeId}: {qty}"));
-                                }
+                                    var qty = wep.GetItemAmount(accept);
+                                    if (qty > 0)
+                                    {
+                                        to.Add(sbuilder_.MakeText($"> {accept.SubtypeId}: {qty}"));
+                                    }
 
-                                OffsetNewline(ref curr_pos);
+                                    sbuilder_.AddNewline();
+                                }
                             }
-                        } else
-                        {
-                            to.Add(MakeTxtSprite(curr_pos, ("    > DRY")));
-                            OffsetNewline(ref curr_pos);
+                            else
+                            {
+                                to.Add(sbuilder_.MakeText(("> DRY")));
+                                sbuilder_.AddNewline();
+                            }
+                            sbuilder_.AddNewline();
                         }
 
-                        OffsetNewline(ref curr_pos);
-                        curr_pos.X = start_x;
                     }
                 }
             }
-            return curr_pos;
+            return sbuilder_.CurrPos;
         }
-        internal Vector2 AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to, Vector2 start)
+        internal Vector2 AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to)
         {
             switch (data)
             {
                 case StatusType.WeaponsSummary:
-                    return AppendForWepSummary(ref to, filter, start);
+                    return AppendForWepSummary(ref to, filter);
                 case StatusType.Invalid:
                     //to.Append("Invalid custom data");
                     return Vector2.Zero;
