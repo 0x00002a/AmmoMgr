@@ -573,7 +573,6 @@ namespace IngameScript
                 sbuilder_.CurrPos = pos;
                 sbuilder_.Scale = data.Scale;
                 sbuilder_.Viewport = viewport;
-                sbuilder_.Surface = surface;
 
                 var end_pos = AppendTxtFor(data.Type, data.Group, ref frame);
 
@@ -643,8 +642,7 @@ namespace IngameScript
                                     if (qty > 0)
                                     {
                                         to.Add(sbuilder_.MakeBulletPt());
-                                        sbuilder_.CurrPos.X += sbuilder_.NEWLINE_HEIGHT;
-                                        to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {qty}"));
+                                        to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {qty}", offset: new Vector2(sbuilder_.NEWLINE_HEIGHT / 2, 0)));
                                     }
 
                                     sbuilder_.AddNewline();
