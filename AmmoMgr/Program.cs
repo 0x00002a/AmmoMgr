@@ -38,7 +38,7 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.3.0";
+        internal const string VERSION = "0.3.1";
         #endregion
 
         #region Fields
@@ -463,6 +463,7 @@ namespace IngameScript
         {
             foreach (var kh in status_lcds_)
             {
+                console.Stdout.WriteLn($"{kh.Key} => {kh.Value}");
                 DrawStatusFor(kh.Key, kh.Value);
             }
         }
@@ -504,18 +505,19 @@ namespace IngameScript
             {
                 foreach (var wep in wep_group)
                 {
-                    if (IsRequester(wep))
+                    var owner_block = wep.Owner as IMyTerminalBlock;
+                    if (owner_block != null && IsWeapon(owner_block))
                     {
+                        to.Append($"[ {owner_block.CustomName} ]\n");
+                        var aval = wep.MaxVolume;
+
+                        to.Append("  ");
+                        DrawProgressBar(to, 5, (double)wep.CurrentVolume, (double)aval);
+                        to.Append("\n");
+
                         HashSet<MyItemType> accepted;
                         if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
                         {
-                            to.Append($"[ {(wep.Owner as IMyTerminalBlock)?.CustomName} ]\n");
-                            var aval = wep.MaxVolume;
-
-                            to.Append("  ");
-                            DrawProgressBar(to, 5, (double)wep.CurrentVolume, (double)aval);
-                            to.Append("\n");
-
                             foreach (var accept in accepted)
                             {
                                 var qty = wep.GetItemAmount(accept);
@@ -524,6 +526,9 @@ namespace IngameScript
                                     to.Append($"    > {accept.SubtypeId}: {qty}\n");
                                 }
                             }
+                        } else
+                        {
+                            to.Append("    > DRY");
                         }
                     }
                 }
