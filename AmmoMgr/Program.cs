@@ -41,6 +41,8 @@ namespace IngameScript
             public Vector2 OriginOffset;
             public Vector2 ScrollOffset;
             public float Scale = 1f;
+            public bool ScrollingUp = false;
+            public bool Scroll;
         }
 
 
@@ -240,8 +242,9 @@ namespace IngameScript
                     var offset_y = status_lcd_parser_.Get(sect, "offset y").ToInt32(0);
                     var origin_offset = new Vector2(offset_x, offset_y);
                     var scale = status_lcd_parser_.Get(sect, "scale").ToDouble(1);
+                    var scroll = status_lcd_parser_.Get(sect, "scroll").ToBoolean(true);
 
-                    var data = new StatusLCDData { Group = group, Type = type, OriginOffset = origin_offset, Scale = (float)scale  };
+                    var data = new StatusLCDData { Group = group, Type = type, OriginOffset = origin_offset, Scale = (float)scale, Scroll = scroll  };
 
                     List<IMyTextSurface> surfaces;
                     if (!readin.TryGetValue(data, out surfaces))
@@ -576,17 +579,21 @@ namespace IngameScript
 
                 var end_pos = AppendTxtFor(data.Type, data.Group, ref frame);
 
-                if (end_pos.Y < viewport.Position.Y)
+                if (data.Scroll)
                 {
-                    data.ScrollOffset -= new Vector2(0, 100);
-                }
-                else if (viewport.Position.Y + viewport.Size.Y < end_pos.Y)
-                {
-                    data.ScrollOffset -= new Vector2(0, 10);
-                }
-                else
-                {
-                    data.ScrollOffset = Vector2.Zero;
+                    if (!data.ScrollingUp && viewport.Position.Y + viewport.Size.Y < end_pos.Y)
+                    {
+                        data.ScrollOffset -= new Vector2(0, 10);
+                    }
+                    else if (data.ScrollingUp && viewport.Position.Y + 5 < pos.Y)
+                    {
+                        data.ScrollingUp = false;
+                    }
+                    else
+                    {
+                        data.ScrollOffset += new Vector2(0, 50);
+                        data.ScrollingUp = true;
+                    }
                 }
                 console.Stdout.WriteLn($"BOX: {viewport}");
 
@@ -596,6 +603,10 @@ namespace IngameScript
             }
 
             lcd_data_cache_.Clear();
+        }
+        internal static Color ColourForProg(int prog)
+        {
+            return prog > 80 ? Color.Green : prog > 50 ? Color.Orange : prog > 30 ? Color.OrangeRed : prog > 10 ? Color.Red : Color.DarkRed;
         }
         
         internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name)
@@ -625,7 +636,7 @@ namespace IngameScript
                             to: ref to, 
                             size: new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (sbuilder_.NEWLINE_HEIGHT / 3)), 
                             bg: Color.White, 
-                            fg: Color.BlueViolet,
+                            fg: ColourForProg((int)((double)wep.CurrentVolume / (double)aval * 100)),
                             curr: (double)wep.CurrentVolume, total: (double)aval
                             );
 

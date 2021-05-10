@@ -69,6 +69,8 @@ namespace IngameScript
             public RectangleF Viewport;
             public Vector2 CurrPos;
             public Vector2 Origin;
+            public Vector2 ScrollOffset;
+
             public float NEWLINE_HEIGHT => newline_height_base * Scale;
 
             internal float newline_height_base = 37f;
