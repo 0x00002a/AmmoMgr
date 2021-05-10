@@ -54,6 +54,7 @@ namespace IngameScript
             public bool ScrollingUp = false;
             public bool Scroll;
             public bool ShortMode;
+            public bool HideZeroEntries;
         }
 
 
@@ -290,6 +291,7 @@ namespace IngameScript
                         Scale = (float)scale, 
                         Scroll = scroll,
                         ShortMode = short_m,
+                        HideZeroEntries = status_lcd_parser_.Get(sect, "hide empty").ToBoolean(true),
                     };
 
                     List<IMyTextSurface> surfaces;
@@ -748,13 +750,15 @@ namespace IngameScript
                                 foreach (var accept in accepted)
                                 {
                                     var qty = wep.GetItemAmount(accept);
-                                    to.Add(sbuilder_.MakeBulletPt());
-                                    to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {(double)qty:00}", offset: new Vector2(sbuilder_.NewlineHeight / 2, 0)));
+                                    if (!data.HideZeroEntries || qty > 0)
+                                    {
+                                        to.Add(sbuilder_.MakeBulletPt());
+                                        to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {(double)qty:00}", offset: new Vector2(sbuilder_.NewlineHeight / 2, 0)));
+                                        sbuilder_.AddNewline();
+                                    }
 
-                                    sbuilder_.AddNewline();
                                 }
                                 sbuilder_.AddNewline();
-
                             }
                         }
                     }
