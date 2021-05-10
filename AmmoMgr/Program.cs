@@ -455,10 +455,7 @@ namespace IngameScript
 
         internal void RefreshTargetingStatus()
         {
-            if (wc_ == null)
-            {
-                return;
-            }
+            
 
             foreach(var parition in partitioned_invs_)
             {
@@ -467,11 +464,17 @@ namespace IngameScript
                     var inv_parent = inv.Owner as IMyTerminalBlock;
                     if (inv_parent != null && IsWeapon(inv_parent))
                     {
-                        var curr_target = wc_.GetWeaponTarget(inv_parent);
-
-
                         var priority = 1;
-                        if (!(curr_target == null || curr_target.Value.EntityId == 0 || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0)))
+                        if (wc_ != null)
+                        {
+                            var curr_target = wc_.GetWeaponTarget(inv_parent);
+
+
+                            if (!(curr_target == null || curr_target.Value.EntityId == 0 || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0)))
+                            {
+                                priority = 2;
+                            }
+                        } else if ((inv_parent as IMyUserControllableGun)?.IsShooting ?? false)
                         {
                             priority = 2;
                         }
