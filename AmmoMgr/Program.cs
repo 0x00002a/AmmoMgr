@@ -32,6 +32,9 @@ namespace IngameScript
         {
             //TotalAmmoSummary,
             WeaponsSummary,
+            ContainerSummary,
+            FullSummary,
+            EngagedSummary,
             Invalid,
         }
         internal class StatusLCDData
@@ -48,7 +51,7 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.3.1";
+        internal const string VERSION = "0.4.0";
         #endregion
 
         #region Fields
@@ -126,7 +129,7 @@ namespace IngameScript
                 return wc_weapons_.Contains(id);
             }
         }
-        internal bool CanContainItem(IMyInventory inv, MyItemType ammo)
+        internal HashSet<MyItemType> AcceptedItems(IMyInventory inv)
         {
             HashSet<MyItemType> allowed;
             if (!inv_allowlist_cache_.TryGetValue(inv, out allowed))
@@ -135,8 +138,12 @@ namespace IngameScript
                 inv.GetAcceptedItems(null, t => { allowed.Add(t); return false; });
                 inv_allowlist_cache_.Add(inv, allowed);
             }
+            return allowed;
 
-            return allowed.Contains(ammo);
+        }
+        internal bool CanContainItem(IMyInventory inv, MyItemType ammo)
+        {
+            return AcceptedItems(inv).Contains(ammo);
         }
         internal bool IsRequester(IMyInventory inv)
         {
@@ -213,10 +220,18 @@ namespace IngameScript
         {
             switch(input)
             {
-                case "WeaponsSummary":
                 case "":
-                case "WepSummary":
+                case "Weapons":
                     output = StatusType.WeaponsSummary;
+                    return true;
+                case "Full":
+                    output = StatusType.FullSummary;
+                    return true;
+                case "Engaged":
+                    output = StatusType.EngagedSummary;
+                    return true;
+                case "Containers":
+                    output = StatusType.ContainerSummary;
                     return true;
                 default:
                     output = StatusType.Invalid;
@@ -612,7 +627,7 @@ namespace IngameScript
             return prog > 80 ? Color.Green : prog > 50 ? Color.Orange : prog > 30 ? Color.OrangeRed : prog > 10 ? Color.Red : Color.DarkRed;
         }
         
-        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame frame, string filter_group_name)
+        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame frame, string filter_group_name, Func<IMyTerminalBlock, bool> accept_filt)
         {
             HashSet<IMyTerminalBlock> filter_group = null;
             if (filter_group_name != null)
@@ -620,7 +635,6 @@ namespace IngameScript
                 block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
             }
 
-                    console.Stdout.WriteLn($"SPRITE WRITTEN RUN");
             sprite_cache_.Clear();
             var to = sprite_cache_;
             foreach (var wep_group in partitioned_invs_)
@@ -629,7 +643,7 @@ namespace IngameScript
                 foreach (var wep in wep_group)
                 {
                     var owner_block = wep.Owner as IMyTerminalBlock;
-                    if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
+                    if (accept_filt(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
                         to.Add(sbuilder_.MakeText($"[ {owner_block.CustomName} ]"));
 
@@ -649,30 +663,22 @@ namespace IngameScript
                         sbuilder_.AddNewline();
                         using (var idn1 = sbuilder_.WithIndent(20))
                         {
-                            HashSet<MyItemType> accepted;
-                            if (inv_allowlist_cache_.TryGetValue(wep, out accepted))
+                            var accepted = AcceptedItems(wep);
+                            foreach (var accept in accepted)
                             {
-                                foreach (var accept in accepted)
-                                {
-                                    var qty = wep.GetItemAmount(accept);
-                                    if (qty > 0)
-                                    {
-                                        to.Add(sbuilder_.MakeBulletPt());
-                                        to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {(double)qty:00}", offset: new Vector2(sbuilder_.NewlineHeight / 2, 0)));
-                                    }
+                                var qty = wep.GetItemAmount(accept);
+                                to.Add(sbuilder_.MakeBulletPt());
+                                to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {(double)qty:00}", offset: new Vector2(sbuilder_.NewlineHeight / 2, 0)));
 
-                                    sbuilder_.AddNewline();
-                                }
+                                sbuilder_.AddNewline();
                             }
                             sbuilder_.AddNewline();
 
                         }
-
                     }
                 }
                 if (sprite_cache_.Count != 0)
                 {
-                    console.Stdout.WriteLn($"SPRITE WRITTEN");
                     box_border.Make(ref frame, (int)sbuilder_.Viewport.Size.X, 10);
 
                     frame.AddRange(sprite_cache_);
@@ -687,13 +693,33 @@ namespace IngameScript
         }
         internal Vector2 AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to)
         {
+            Func<IMyTerminalBlock, bool> filter_act = null;
             switch (data)
             {
                 case StatusType.WeaponsSummary:
-                    return AppendForWepSummary(ref to, filter);
+                    filter_act = b => b != null && IsWeapon(b);
+                    break;
+                case StatusType.ContainerSummary:
+                    filter_act = b => b != null && !IsWeapon(b);
+                    break;
+                case StatusType.FullSummary:
+                    filter_act = b => b != null;
+                    break;
+                case StatusType.EngagedSummary:
+                    filter_act = b => b != null && Priority(b.GetInventory()) >= 3;
+                    break;
+
             }
-            to.Add(sbuilder_.MakeText("Invalid status type in custom data", alignment: TextAlignment.CENTER, color: Color.Red));
-            return Vector2.Zero;
+
+            if (filter_act != null)
+            {
+                return AppendForWepSummary(ref to, filter, filter_act);
+            }
+            else
+            {
+                to.Add(sbuilder_.MakeText("Invalid status type in custom data", alignment: TextAlignment.CENTER, color: Color.Red));
+                return Vector2.Zero;
+            }
         }
 
         #endregion
