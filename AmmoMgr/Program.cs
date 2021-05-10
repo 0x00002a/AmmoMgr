@@ -27,6 +27,13 @@ namespace IngameScript
             public IMyInventory Parent;
             public MyInventoryItem Item;
         }
+        internal enum Priority
+        {
+            Unknown = -1,
+            Container = 0,
+            InactiveWeapon = 1,
+            ActiveWeapon = 2,
+        };
         
         internal enum StatusType
         {
@@ -59,7 +66,7 @@ namespace IngameScript
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
         internal List<HashSet<IMyInventory>> partitioned_invs_ = new List<HashSet<IMyInventory>>();
-        internal Dictionary<IMyInventory, int> requester_cache_ = new Dictionary<IMyInventory, int>();
+        internal Dictionary<IMyInventory, Priority> requester_cache_ = new Dictionary<IMyInventory, Priority>();
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
         internal List<string> actions_log_ = new List<string>();
         internal Dictionary<StatusLCDData, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusLCDData, List<IMyTextSurface>>();
@@ -148,7 +155,7 @@ namespace IngameScript
         }
         internal bool IsRequester(IMyInventory inv)
         {
-            int priority;
+            Priority priority;
             if (!requester_cache_.TryGetValue(inv, out priority))
             {
                 return false;
@@ -160,21 +167,15 @@ namespace IngameScript
 
         internal bool IsSameOrHigherPriority(IMyInventory target, IMyInventory than)
         {
-            int target_p;
-            int than_p;
-            if (!requester_cache_.TryGetValue(target, out target_p) || !requester_cache_.TryGetValue(than, out than_p))
-            {
-                return false;
-            }
-            return target_p >= than_p;
+            return PriorityFor(target) >= PriorityFor(than);
         }
 
-        internal int Priority(IMyInventory inv)
+        internal Priority PriorityFor(IMyInventory inv)
         {
-            int p;
+            Priority p;
             if (!requester_cache_.TryGetValue(inv, out p))
             {
-                return -1;
+                return Priority.Unknown;
             }
             else
             {
@@ -322,7 +323,7 @@ namespace IngameScript
         {
             var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
 
-            requester_cache_[inv] = is_requester ? 1 : 0;
+            requester_cache_[inv] = is_requester ? Priority.InactiveWeapon : Priority.Container;
             return inv;
 
         }
@@ -383,7 +384,7 @@ namespace IngameScript
                         && IsSameOrHigherPriority(inv, from_inv) 
                         && ((double)inv.GetItemAmount(target_item.Item.Type) < per_inv)
                         && from_inv.IsConnectedTo(inv) 
-                        && (Priority(from_inv) < Priority(inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) > per_inv))
+                        && (PriorityFor(from_inv) < PriorityFor(inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) > per_inv))
                     {
                         var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
@@ -464,7 +465,7 @@ namespace IngameScript
                     var inv_parent = inv.Owner as IMyTerminalBlock;
                     if (inv_parent != null && IsWeapon(inv_parent))
                     {
-                        var priority = 1;
+                        var priority = Priority.InactiveWeapon;
                         if (wc_ != null)
                         {
                             var curr_target = wc_.GetWeaponTarget(inv_parent);
@@ -472,11 +473,11 @@ namespace IngameScript
 
                             if (!(curr_target == null || curr_target.Value.EntityId == 0 || !wc_.CanShootTarget(inv_parent, ((MyDetectedEntityInfo)curr_target).EntityId, 0)))
                             {
-                                priority = 2;
+                                priority = Priority.ActiveWeapon;
                             }
                         } else if ((inv_parent as IMyUserControllableGun)?.IsShooting ?? false)
                         {
-                            priority = 2;
+                            priority = Priority.ActiveWeapon;
                         }
 
                         requester_cache_[inv] = priority;
@@ -736,7 +737,7 @@ namespace IngameScript
                     filter_act = b => b != null;
                     break;
                 case StatusType.EngagedSummary:
-                    filter_act = b => b != null && Priority(b.GetInventory()) >= 3;
+                    filter_act = b => b != null && PriorityFor(b.GetInventory()) >= Priority.ActiveWeapon;
                     break;
 
             }
