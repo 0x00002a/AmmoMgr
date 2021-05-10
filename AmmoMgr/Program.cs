@@ -100,12 +100,16 @@ namespace IngameScript
         #endregion
 
         #region Util 
+        internal static bool IsAmmo(MyItemType type)
+        {
+            return type.TypeId == AMMO_TYPE_NAME;
+        }
 
         internal static void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
         {
             foreach(var item in items)
             {
-                if (item.Type.TypeId.ToString() == AMMO_TYPE_NAME)
+                if (IsAmmo(item.Type))
                 {
                     List<AmmoItemData> target_set;
                     var key = item.Type.SubtypeId.ToString();
@@ -151,7 +155,13 @@ namespace IngameScript
             if (!inv_allowlist_cache_.TryGetValue(inv, out allowed))
             {
                 allowed = new HashSet<MyItemType>();
-                inv.GetAcceptedItems(null, t => { allowed.Add(t); return false; });
+                inv.GetAcceptedItems(null, t => {
+                    if (IsAmmo(t))
+                    {
+                        allowed.Add(t);
+                    }
+                    return false; 
+                });
                 inv_allowlist_cache_.Add(inv, allowed);
             }
             return allowed;
