@@ -466,7 +466,7 @@ namespace IngameScript
                     if (inv_parent != null && IsWeapon(inv_parent))
                     {
                         var priority = Priority.InactiveWeapon;
-                        if (wc_ != null)
+                        if (wc_ != null && wc_weapons_.Contains(inv_parent.BlockDefinition))
                         {
                             var curr_target = wc_.GetWeaponTarget(inv_parent);
 
