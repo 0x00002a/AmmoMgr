@@ -71,6 +71,8 @@ namespace IngameScript
         internal List<string> actions_log_ = new List<string>();
         internal Dictionary<StatusLCDData, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusLCDData, List<IMyTextSurface>>();
         internal Dictionary<string, HashSet<IMyTerminalBlock>> block_groups_cache_ = new Dictionary<string, HashSet<IMyTerminalBlock>>();
+        internal Dictionary<IMyInventory, bool> cache_outdated_lookup_ = new Dictionary<IMyInventory, bool>();
+        internal List<IMyInventory> outdated_inv_store_ = new List<IMyInventory>();
         internal List<MySprite> sprite_cache_ = new List<MySprite>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal MyIni status_lcd_parser_ = new MyIni();
@@ -352,6 +354,33 @@ namespace IngameScript
             var owner = inv?.Owner as IMyTerminalBlock;
             return owner?.CustomName ?? "";
         }
+        internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin, HashSet<IMyInventory> parition)
+        {
+            if (inv.Owner is IMyTerminalBlock)
+            {
+                if (parition == null)
+                {
+                    parition = readin.FirstOrDefault(set => set.Contains(inv));
+
+                    if (parition == null)
+                    {
+                        parition = new HashSet<IMyInventory>();
+                        readin.Add(parition);
+                    }
+                }
+
+                parition.Add(inv);
+                cache_outdated_lookup_[inv] = false;
+
+                foreach (var peer in all)
+                {
+                    if (inv.IsConnectedTo(peer) && !parition.Contains(peer))
+                    {
+                        //AddInventory(peer, all, readin, parition);
+                    }
+                }
+            }
+        }
 
         internal void RefreshInventories(List<HashSet<IMyInventory>> readin)
         {
@@ -362,26 +391,7 @@ namespace IngameScript
             var flat_inventories = block_cache.Where(b => b.HasInventory).Select(b => b.GetInventory()).ToList();
             foreach(var inv in flat_inventories)
             {
-                if (inv.Owner is IMyTerminalBlock)
-                {
-                    var item = CreateInvData(inv);
-                    var parition = readin.FirstOrDefault(set => set.Contains(item));
-                    if (parition == null)
-                    {
-                        parition = new HashSet<IMyInventory>();
-                        readin.Add(parition);
-                    }
-                    foreach(var peer in flat_inventories)
-                    {
-                        if (inv.IsConnectedTo(peer))
-                        {
-                            if (peer.Owner is IMyTerminalBlock)
-                            {
-                                parition.Add(CreateInvData(peer));
-                            }
-                        }
-                    }
-                }
+                AddInventory(inv, flat_inventories, readin, null);
             }
             
         }
@@ -506,11 +516,36 @@ namespace IngameScript
 
             }
 
-
         }
+        internal void MarkInvCacheOutdated()
+        {
+            foreach(var parition in partitioned_invs_)
+            {
+                cache_outdated_lookup_[kh.Key] = true;
+            }
+        }
+
 
         #endregion
         #region Cleanup
+
+        internal void RemoveOutdatedInvs()
+        {
+            outdated_inv_store_.Clear();
+            foreach(var kh in cache_outdated_lookup_)
+            {
+                if (kh.Value)
+                {
+                    outdated_inv_store_.Add(kh.Key);
+                }
+            }
+            foreach(var outdated in outdated_inv_store_)
+            {
+                cache_outdated_lookup_.Remove(outdated);
+                partitioned_invs_.FirstOrDefault(p => p.Contains(outdated))?.Remove(outdated);
+            }
+            outdated_inv_store_.Clear();
+        }
 
         #endregion
 
@@ -576,8 +611,13 @@ namespace IngameScript
                     {
                         actions_log_.Clear();
                         ClearLists(avaliability_lookup_);
+                        MarkInvCacheOutdated();
                         ScanInventories(partitioned_invs_, avaliability_lookup_);
                         RebalanceInventories(partitioned_invs_, avaliability_lookup_);
+                    }
+                    if (ticks_10 % 18 == 0) // Clear old inventories every 3 seconds 
+                    {
+                        RemoveOutdatedInvs();
                     }
 
                     WriteStatsToStdout();
