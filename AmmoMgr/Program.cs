@@ -46,6 +46,7 @@ namespace IngameScript
             public float Scale = 1f;
             public bool ScrollingUp = false;
             public bool Scroll;
+            public bool ShortMode;
         }
 
 
@@ -260,8 +261,17 @@ namespace IngameScript
                     var origin_offset = new Vector2(offset_x, offset_y);
                     var scale = status_lcd_parser_.Get(sect, "scale").ToDouble(1);
                     var scroll = status_lcd_parser_.Get(sect, "scroll").ToBoolean(true);
+                    var short_m = status_lcd_parser_.Get(sect, "oneline").ToBoolean(false);
 
-                    var data = new StatusLCDData { Group = group, Type = type, OriginOffset = origin_offset, Scale = (float)scale, Scroll = scroll  };
+                    var data = new StatusLCDData { 
+                        Group = group, 
+                        Type = type, 
+                        OriginOffset = 
+                        origin_offset, 
+                        Scale = (float)scale, 
+                        Scroll = scroll,
+                        ShortMode = short_m,
+                    };
 
                     List<IMyTextSurface> surfaces;
                     if (!readin.TryGetValue(data, out surfaces))
@@ -594,8 +604,9 @@ namespace IngameScript
                 sbuilder_.CurrPos = pos;
                 sbuilder_.Scale = data.Scale;
                 sbuilder_.Viewport = viewport;
+                sbuilder_.Surface = surface;
 
-                var end_pos = AppendTxtFor(data.Type, data.Group, ref frame);
+                var end_pos = AppendTxtFor(data, ref frame);
 
                 if (data.Scroll)
                 {
@@ -627,9 +638,10 @@ namespace IngameScript
             return prog > 80 ? Color.Green : prog > 50 ? Color.Orange : prog > 30 ? Color.OrangeRed : prog > 10 ? Color.Red : Color.DarkRed;
         }
         
-        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame frame, string filter_group_name, Func<IMyTerminalBlock, bool> accept_filt)
+        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame frame, StatusLCDData data, Func<IMyTerminalBlock, bool> accept_filt)
         {
             HashSet<IMyTerminalBlock> filter_group = null;
+            var filter_group_name = data.Group;
             if (filter_group_name != null)
             {
                 block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
@@ -645,35 +657,48 @@ namespace IngameScript
                     var owner_block = wep.Owner as IMyTerminalBlock;
                     if (accept_filt(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
-                        to.Add(sbuilder_.MakeText($"[ {owner_block.CustomName} ]"));
+                        var title_txt = $"[ {owner_block.CustomName} ]";
+                        to.Add(sbuilder_.MakeText(title_txt));
 
 
-                        sbuilder_.AddNewline();
+                        SpriteBuilder.IndentProxy? maybe_indent = null;
+                        if (data.ShortMode)
+                        {
+                            maybe_indent = sbuilder_.WithIndent((int)(sbuilder_.TextSizePx(title_txt).X + sbuilder_.NewlineHeight));
+                        }
+                        else
+                        {
+                            sbuilder_.AddNewline();
+                        }
                         var aval = wep.MaxVolume;
 
                         sbuilder_.MakeProgressBar(
                             to: to,
-                            size: new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (SpriteBuilder.NEWLINE_HEIGHT_BASE / 3)),
+                            size:  new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (SpriteBuilder.NEWLINE_HEIGHT_BASE / 3)),
                             bg: Color.White,
                             fg: ColourForProg((int)((double)wep.CurrentVolume / (double)aval * 100)),
                             curr: (double)wep.CurrentVolume, total: (double)aval
                             );
+                        maybe_indent?.Dispose();
 
 
                         sbuilder_.AddNewline();
-                        using (var idn1 = sbuilder_.WithIndent(20))
+                        if (!data.ShortMode)
                         {
-                            var accepted = AcceptedItems(wep);
-                            foreach (var accept in accepted)
+                            using (var idn1 = sbuilder_.WithIndent(20))
                             {
-                                var qty = wep.GetItemAmount(accept);
-                                to.Add(sbuilder_.MakeBulletPt());
-                                to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {(double)qty:00}", offset: new Vector2(sbuilder_.NewlineHeight / 2, 0)));
+                                var accepted = AcceptedItems(wep);
+                                foreach (var accept in accepted)
+                                {
+                                    var qty = wep.GetItemAmount(accept);
+                                    to.Add(sbuilder_.MakeBulletPt());
+                                    to.Add(sbuilder_.MakeText($"{accept.SubtypeId}: {(double)qty:00}", offset: new Vector2(sbuilder_.NewlineHeight / 2, 0)));
 
+                                    sbuilder_.AddNewline();
+                                }
                                 sbuilder_.AddNewline();
-                            }
-                            sbuilder_.AddNewline();
 
+                            }
                         }
                     }
                 }
@@ -691,10 +716,11 @@ namespace IngameScript
             }
             return sbuilder_.CurrPos;
         }
-        internal Vector2 AppendTxtFor(StatusType data, string filter, ref MySpriteDrawFrame to)
+        internal Vector2 AppendTxtFor(StatusLCDData data, ref MySpriteDrawFrame to)
         {
             Func<IMyTerminalBlock, bool> filter_act = null;
-            switch (data)
+            var status = data.Type;
+            switch (status)
             {
                 case StatusType.WeaponsSummary:
                     filter_act = b => b != null && IsWeapon(b);
@@ -713,7 +739,7 @@ namespace IngameScript
 
             if (filter_act != null)
             {
-                return AppendForWepSummary(ref to, filter, filter_act);
+                return AppendForWepSummary(ref to, data, filter_act);
             }
             else
             {

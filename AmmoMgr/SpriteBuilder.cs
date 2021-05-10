@@ -63,14 +63,33 @@ namespace IngameScript
             public float Scale;
             public RectangleF Viewport;
             public Vector2 CurrPos;
-            public Vector2 Origin;
-            public Vector2 ScrollOffset;
+            public IMyTextSurface Surface;
+
 
             internal Vector2 NewlineCenterOffset => new Vector2(0, NewlineHeight / 4);
+            internal StringBuilder str_cache_;
 
             public float NewlineHeight => NEWLINE_HEIGHT_BASE * Scale;
 
             public const float NEWLINE_HEIGHT_BASE = 37f;
+
+            public Vector2 TextSizePx(string txt, IMyTextSurface reference = null,  string font_id = "White")
+            {
+                reference = reference ?? Surface;
+                if (str_cache_ == null)
+                {
+                    str_cache_ = new StringBuilder();
+                } else
+                {
+                    str_cache_.Clear();
+                }
+
+                str_cache_.Append(txt);
+                var size = reference.MeasureStringInPixels(str_cache_, font_id, Scale);
+                str_cache_.Clear();
+                return size;
+
+            }
 
             public IndentProxy WithIndent(int by)
             {
