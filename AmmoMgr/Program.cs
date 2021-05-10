@@ -330,7 +330,6 @@ namespace IngameScript
         #region Running
         internal void WriteStatsToStdout()
         {
-            console.Stdout.WriteLn($"Inventories: {partitioned_invs_.Sum(pre =>  pre.Count )}");
 
             foreach(var act in actions_log_)
             {
@@ -518,6 +517,7 @@ namespace IngameScript
         #region Entry points
         public Program()
         {
+            ParseConfig();
             var wc = new WcPbApi();
             if (!wc.Activate(Me))
             {
@@ -530,7 +530,6 @@ namespace IngameScript
             }
             ScanForLCDs(status_lcds_);
             ScanGroups();
-            ParseConfig();
             
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
@@ -629,7 +628,6 @@ namespace IngameScript
                     if (!data.ScrollingUp && viewport.Position.Y + viewport.Size.Y < end_pos.Y)
                     {
                         data.ScrollOffset -= new Vector2(0, 10);
-                        console.Stdout.WriteLn($"DATA: {viewport.Position.Y + viewport.Size.Y}");
                     }
                     else if (data.ScrollingUp && viewport.Position.Y + 5 < pos.Y)
                     {
@@ -641,7 +639,6 @@ namespace IngameScript
                         data.ScrollingUp = true;
                     }
                 }
-                console.Stdout.WriteLn($"BOX: {viewport}, {end_pos}, {data.ScrollOffset}");
 
 
                 frame.Dispose();
