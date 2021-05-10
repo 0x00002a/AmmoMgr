@@ -374,9 +374,9 @@ namespace IngameScript
 
                 foreach (var peer in all)
                 {
-                    if (inv.IsConnectedTo(peer) && !parition.Contains(peer))
+                    if (inv.IsConnectedTo(peer))
                     {
-                        //AddInventory(peer, all, readin, parition);
+                        parition.Add(peer);
                     }
                 }
             }
@@ -467,13 +467,14 @@ namespace IngameScript
 
         }
 
-        internal static void ScanInventories(List<HashSet<IMyInventory>> inventories, Dictionary<string, List<AmmoItemData>> readin)
+        internal void ScanInventories(List<HashSet<IMyInventory>> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
             var items_tmp = new List<MyInventoryItem>();
             foreach(var part in inventories)
             {
                 foreach (var inv in part)
                 {
+                    cache_outdated_lookup_[inv] = true;
                     items_tmp.Clear();
                     inv.GetItems(items_tmp);
 
@@ -519,10 +520,7 @@ namespace IngameScript
         }
         internal void MarkInvCacheOutdated()
         {
-            foreach(var parition in partitioned_invs_)
-            {
-                cache_outdated_lookup_[kh.Key] = true;
-            }
+            
         }
 
 
@@ -605,19 +603,14 @@ namespace IngameScript
                     if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 seconds 
                     {
                         RefreshInventories(partitioned_invs_);
-
+                        RemoveOutdatedInvs();
                     }
                     else if (ticks_10 % 3 == 0)
                     {
                         actions_log_.Clear();
                         ClearLists(avaliability_lookup_);
-                        MarkInvCacheOutdated();
                         ScanInventories(partitioned_invs_, avaliability_lookup_);
                         RebalanceInventories(partitioned_invs_, avaliability_lookup_);
-                    }
-                    if (ticks_10 % 18 == 0) // Clear old inventories every 3 seconds 
-                    {
-                        RemoveOutdatedInvs();
                     }
 
                     WriteStatsToStdout();
