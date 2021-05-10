@@ -608,11 +608,12 @@ namespace IngameScript
 
                 var end_pos = AppendTxtFor(data, ref frame);
 
-                if (data.Scroll)
+                if (data.Scroll && !viewport.Contains(end_pos) || data.ScrollOffset.LengthSquared() > 0)
                 {
                     if (!data.ScrollingUp && viewport.Position.Y + viewport.Size.Y < end_pos.Y)
                     {
                         data.ScrollOffset -= new Vector2(0, 10);
+                        console.Stdout.WriteLn($"DATA: {viewport.Position.Y + viewport.Size.Y}");
                     }
                     else if (data.ScrollingUp && viewport.Position.Y + 5 < pos.Y)
                     {
@@ -624,7 +625,7 @@ namespace IngameScript
                         data.ScrollingUp = true;
                     }
                 }
-                console.Stdout.WriteLn($"BOX: {viewport}, {end_pos}");
+                console.Stdout.WriteLn($"BOX: {viewport}, {end_pos}, {data.ScrollOffset}");
 
 
                 frame.Dispose();
