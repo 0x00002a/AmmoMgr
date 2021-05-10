@@ -73,10 +73,16 @@ namespace IngameScript
         internal Dictionary<string, HashSet<IMyTerminalBlock>> block_groups_cache_ = new Dictionary<string, HashSet<IMyTerminalBlock>>();
         internal List<MySprite> sprite_cache_ = new List<MySprite>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
-        internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
         internal WcPbApi wc_;
         internal SpriteBuilder sbuilder_ = new SpriteBuilder();
+        internal string lcd_tag_;
+
+        #region Ini Keys 
+        internal const string INI_SECT_NAME = "AmmoMgr";
+        internal static MyIniKey LCD_TAG_KEY = new MyIniKey(INI_SECT_NAME, "lcd tag");
+
+        #endregion
 
 
 
@@ -196,7 +202,7 @@ namespace IngameScript
         }
         internal void ScanForLCDs(Dictionary<StatusLCDData, List<IMyTextSurface>> readin)
         {
-            var search_str = LCD_STATUS_PREFIX;
+            var search_str = lcd_tag_;
 
             var blocks_tmp = new List<IMyTextSurfaceProvider>();
             GridTerminalSystem.GetBlocksOfType(blocks_tmp);
@@ -303,6 +309,20 @@ namespace IngameScript
                 
                 
                 return false; });
+        }
+
+        internal void ParseConfig()
+        {
+            status_lcd_parser_.Clear();
+            if (!status_lcd_parser_.TryParse(Me.CustomData))
+            {
+                console.Persistout.WriteLn("[WARN]: PB has invalid custom data, fix it then recompile to have config applied");
+                return;
+            }
+
+            lcd_tag_ = status_lcd_parser_.Get(LCD_TAG_KEY).ToString("AmmoMgrLCD");
+
+            status_lcd_parser_.Clear();
         }
 
         #endregion
@@ -510,6 +530,7 @@ namespace IngameScript
             }
             ScanForLCDs(status_lcds_);
             ScanGroups();
+            ParseConfig();
             
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
@@ -537,15 +558,6 @@ namespace IngameScript
 
                 try
                 {
-                    if (argument == "refresh" && (updateSource & UpdateType.Terminal) == 0)
-                    {
-                        foreach (var surf in status_lcds_)
-                        {
-                            surf.Value.Clear();
-                        }
-                        ScanGroups();
-                        ScanForLCDs(status_lcds_);
-                    }
 
                     if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
                     {
