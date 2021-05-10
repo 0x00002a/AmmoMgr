@@ -172,6 +172,12 @@ namespace IngameScript
         {
             return AcceptedItems(inv).Contains(ammo);
         }
+       
+        internal bool CanContainAmmo(IMyInventory inv)
+        {
+            return AcceptedItems(inv).Any(i => IsAmmo(i));
+        }
+        
         internal bool IsRequester(IMyInventory inv)
         {
             Priority priority;
@@ -352,23 +358,19 @@ namespace IngameScript
 
         }
 
-        internal IMyInventory CreateInvData(IMyInventory inv)
-        {
-            var is_requester = IsWeapon((IMyTerminalBlock)inv.Owner);
-
-            requester_cache_[inv] = is_requester ? Priority.InactiveWeapon : Priority.Container;
-            return inv;
-
-        }
 
         internal static string OwnerName(IMyInventory inv)
         {
             var owner = inv?.Owner as IMyTerminalBlock;
             return owner?.CustomName ?? "";
         }
+        internal bool IsValidInventory(IMyInventory inv)
+        {
+            return inv.Owner is IMyTerminalBlock && CanContainAmmo(inv);
+        }
         internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin, HashSet<IMyInventory> parition)
         {
-            if (inv.Owner is IMyTerminalBlock)
+            if (IsValidInventory(inv))
             {
                 if (parition == null)
                 {
@@ -386,7 +388,7 @@ namespace IngameScript
 
                 foreach (var peer in all)
                 {
-                    if (inv.IsConnectedTo(peer))
+                    if (inv.IsConnectedTo(peer) && IsValidInventory(peer))
                     {
                         parition.Add(peer);
                     }
