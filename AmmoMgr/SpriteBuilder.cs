@@ -53,12 +53,12 @@ namespace IngameScript
                     var size = new RectangleF(origin_, new Vector2( width, parent_.CurrPos.Y - origin_.Y));
                     return new MySprite
                     {
-                        Type = SpriteType.TEXT,
+                        Type = SpriteType.TEXTURE,
                         Data = "SquareHollow",
                         Size = size.Size,
                         Position = size.Center,
                         Alignment = TextAlignment.CENTER,
-                        Color = Color.Red,
+                        Color = Color.Aqua.Alpha(0.8f),
                     };
 
                 }
@@ -103,7 +103,7 @@ namespace IngameScript
                 };
             }
 
-            public void MakeProgressBar(ref MySpriteDrawFrame to, Vector2 size, Color bg, Color fg, double curr, double total)
+            public void MakeProgressBar(ICollection<MySprite> to, Vector2 size, Color bg, Color fg, double curr, double total)
             {
                 var padding = new Vector2(2, 2);
                 size *= Scale;

@@ -60,6 +60,7 @@ namespace IngameScript
         internal List<string> actions_log_ = new List<string>();
         internal Dictionary<StatusLCDData, List<IMyTextSurface>> status_lcds_ = new Dictionary<StatusLCDData, List<IMyTextSurface>>();
         internal Dictionary<string, HashSet<IMyTerminalBlock>> block_groups_cache_ = new Dictionary<string, HashSet<IMyTerminalBlock>>();
+        internal List<MySprite> sprite_cache_ = new List<MySprite>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal string LCD_STATUS_PREFIX = "AmmoMgrLCD";
         internal MyIni status_lcd_parser_ = new MyIni();
@@ -303,7 +304,7 @@ namespace IngameScript
         internal static string OwnerName(IMyInventory inv)
         {
             var owner = inv?.Owner as IMyTerminalBlock;
-            return owner == null ? "" : owner.CustomName;
+            return owner?.CustomName ?? "";
         }
 
         internal void RefreshInventories(List<HashSet<IMyInventory>> readin)
@@ -512,6 +513,7 @@ namespace IngameScript
                         {
                             surf.Value.Clear();
                         }
+                        ScanGroups();
                         ScanForLCDs(status_lcds_);
                     }
 
@@ -524,7 +526,7 @@ namespace IngameScript
                     }
 
                     var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
-                    if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 minutes 
+                    if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 seconds 
                     {
                         RefreshInventories(partitioned_invs_);
 
@@ -609,7 +611,7 @@ namespace IngameScript
             return prog > 80 ? Color.Green : prog > 50 ? Color.Orange : prog > 30 ? Color.OrangeRed : prog > 10 ? Color.Red : Color.DarkRed;
         }
         
-        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame to, string filter_group_name)
+        internal Vector2 AppendForWepSummary(ref MySpriteDrawFrame frame, string filter_group_name)
         {
             HashSet<IMyTerminalBlock> filter_group = null;
             if (filter_group_name != null)
@@ -617,6 +619,8 @@ namespace IngameScript
                 block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
             }
 
+            sprite_cache_.Clear();
+            var to = sprite_cache_;
             foreach (var wep_group in partitioned_invs_)
             {
                 foreach (var wep in wep_group)
@@ -633,7 +637,7 @@ namespace IngameScript
                         var aval = wep.MaxVolume;
 
                         sbuilder_.MakeProgressBar(
-                            to: ref to, 
+                            to: to, 
                             size: new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (sbuilder_.NEWLINE_HEIGHT / 3)), 
                             bg: Color.White, 
                             fg: ColourForProg((int)((double)wep.CurrentVolume / (double)aval * 100)),
@@ -660,7 +664,12 @@ namespace IngameScript
                                 }
                             }
                             sbuilder_.AddNewline();
-                            to.Add(box_border.Make((int)sbuilder_.Viewport.Size.X));
+                            var box = box_border.Make((int)sbuilder_.Viewport.Size.X);
+                            frame.Add(box);
+
+                            frame.AddRange(sprite_cache_);
+                            sbuilder_.AddNewline();
+                            sprite_cache_.Clear();
                         }
 
                     }
