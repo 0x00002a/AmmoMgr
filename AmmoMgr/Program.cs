@@ -214,6 +214,7 @@ namespace IngameScript
             switch(input)
             {
                 case "WeaponsSummary":
+                case "":
                 case "WepSummary":
                     output = StatusType.WeaponsSummary;
                     return true;
@@ -597,7 +598,7 @@ namespace IngameScript
                         data.ScrollingUp = true;
                     }
                 }
-                console.Stdout.WriteLn($"BOX: {viewport}");
+                console.Stdout.WriteLn($"BOX: {viewport}, {end_pos}");
 
 
                 frame.Dispose();
@@ -619,6 +620,7 @@ namespace IngameScript
                 block_groups_cache_.TryGetValue(filter_group_name, out filter_group);
             }
 
+                    console.Stdout.WriteLn($"SPRITE WRITTEN RUN");
             sprite_cache_.Clear();
             var to = sprite_cache_;
             foreach (var wep_group in partitioned_invs_)
@@ -670,6 +672,7 @@ namespace IngameScript
                 }
                 if (sprite_cache_.Count != 0)
                 {
+                    console.Stdout.WriteLn($"SPRITE WRITTEN");
                     box_border.Make(ref frame, (int)sbuilder_.Viewport.Size.X, 10);
 
                     frame.AddRange(sprite_cache_);
@@ -688,10 +691,8 @@ namespace IngameScript
             {
                 case StatusType.WeaponsSummary:
                     return AppendForWepSummary(ref to, filter);
-                case StatusType.Invalid:
-                    //to.Append("Invalid custom data");
-                    return Vector2.Zero;
             }
+            to.Add(sbuilder_.MakeText("Invalid status type in custom data", alignment: TextAlignment.CENTER, color: Color.Red));
             return Vector2.Zero;
         }
 
