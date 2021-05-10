@@ -52,24 +52,10 @@ namespace IngameScript
                 {
                     var size = new RectangleF(origin_, new Vector2( width, parent_.CurrPos.Y - origin_.Y));
 
-                    /*to.Add(parent_.MakeRect( // Left
-                        start: origin_,
-                        end: new Vector2(origin_.X + line_width, parent_.CurrPos.Y))
-                        );
-                    to.Add(parent_.MakeRect( // Top
-                        start: origin_,
-                        end: new Vector2(origin_.X + width, origin_.Y + line_width)
-                        ));*/
                     to.Add(parent_.MakeRect( // Right
                         start: new Vector2(origin_.X + width - line_width, origin_.Y),
                         end: new Vector2(origin_.X + width, parent_.CurrPos.Y)
                         )); 
-                    /*to.Add(parent_.MakeRect( // Bottom
-                        start: origin_,
-                        end: new Vector2(origin_.X + width, origin_.Y + line_width)
-                        ));*/
-
-
                 }
             }
             
@@ -80,9 +66,11 @@ namespace IngameScript
             public Vector2 Origin;
             public Vector2 ScrollOffset;
 
-            public float NEWLINE_HEIGHT => newline_height_base * Scale;
+            internal Vector2 NewlineCenterOffset => new Vector2(0, NewlineHeight / 4);
 
-            internal float newline_height_base = 37f;
+            public float NewlineHeight => NEWLINE_HEIGHT_BASE * Scale;
+
+            public const float NEWLINE_HEIGHT_BASE = 37f;
 
             public IndentProxy WithIndent(int by)
             {
@@ -95,7 +83,7 @@ namespace IngameScript
             }
             public void AddNewline()
             {
-                CurrPos.Y += NEWLINE_HEIGHT;
+                CurrPos.Y += NewlineHeight;
             }
             public MySprite MakeRect(Vector2 start, Vector2 end, Color? fg = null)
             {
@@ -115,14 +103,14 @@ namespace IngameScript
             public MySprite MakeBulletPt(Color? fg = null)
             {
                 var color = fg ?? Color.White;
-                var bounds = new RectangleF(CurrPos, new Vector2(NEWLINE_HEIGHT / 3, NEWLINE_HEIGHT / 3) * Scale);
+                var bounds = new RectangleF(CurrPos, new Vector2(NewlineHeight / 3, NewlineHeight / 3));
                 return new MySprite
                 {
-                    Data = "CircleHollow",
+                    Data = "Circle",
                     Type = SpriteType.TEXTURE,
                     Color = color,
                     Alignment = TextAlignment.CENTER,
-                    Position = bounds.Center,
+                    Position = bounds.Center + NewlineCenterOffset,
                     Size = bounds.Size,
                 };
             }
@@ -138,7 +126,7 @@ namespace IngameScript
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareTapered",
-                    Position = bg_rect.Center,
+                    Position = bg_rect.Center + NewlineCenterOffset,
                     Color = bg,
                     Alignment = TextAlignment.CENTER,
                     Size = bg_rect.Size,
@@ -151,7 +139,7 @@ namespace IngameScript
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
-                    Position = fg_rect.Center,
+                    Position = fg_rect.Center + NewlineCenterOffset,
                     Color = fg,
                     Alignment = TextAlignment.CENTER,
                     Size = fg_rect.Size,
@@ -160,7 +148,7 @@ namespace IngameScript
                 var txt_rect = new RectangleF(bg_rect.Position + new Vector2(bg_rect.Size.X + 5, 0), new Vector2(90, 0));
                 to.Add(MakeText(
                     txt: $"{curr / total * 100:00}%",
-                    offset: new Vector2(bg_rect.Size.X + NEWLINE_HEIGHT, bg_rect.Size.Y / 4),
+                    offset: new Vector2(bg_rect.Size.X + NewlineHeight, bg_rect.Size.Y / 4),
                     alignment: TextAlignment.CENTER
                     )
                 );
