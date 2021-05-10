@@ -623,13 +623,14 @@ namespace IngameScript
             var to = sprite_cache_;
             foreach (var wep_group in partitioned_invs_)
             {
+                var box_border = new SpriteBuilder.BoxedProxy(sbuilder_);
+                sbuilder_.AddNewline();
                 foreach (var wep in wep_group)
                 {
                     var owner_block = wep.Owner as IMyTerminalBlock;
                     if (owner_block != null && IsWeapon(owner_block) && (filter_group == null || filter_group.Contains(owner_block)))
                     {
 
-                        var box_border = new SpriteBuilder.BoxedProxy(sbuilder_);
                         to.Add(sbuilder_.MakeText($"[ {owner_block.CustomName} ]"));
 
 
@@ -637,9 +638,9 @@ namespace IngameScript
                         var aval = wep.MaxVolume;
 
                         sbuilder_.MakeProgressBar(
-                            to: to, 
-                            size: new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (sbuilder_.NEWLINE_HEIGHT / 3)), 
-                            bg: Color.White, 
+                            to: to,
+                            size: new Vector2(sbuilder_.Viewport.Size.X / 6, 2 * (sbuilder_.NEWLINE_HEIGHT / 3)),
+                            bg: Color.White,
                             fg: ColourForProg((int)((double)wep.CurrentVolume / (double)aval * 100)),
                             curr: (double)wep.CurrentVolume, total: (double)aval
                             );
@@ -664,16 +665,19 @@ namespace IngameScript
                                 }
                             }
                             sbuilder_.AddNewline();
-                            var box = box_border.Make((int)sbuilder_.Viewport.Size.X);
-                            frame.Add(box);
 
-                            frame.AddRange(sprite_cache_);
-                            sbuilder_.AddNewline();
-                            sprite_cache_.Clear();
                         }
 
                     }
                 }
+                box_border.Make(ref frame, (int)sbuilder_.Viewport.Size.X, 10);
+
+                frame.AddRange(sprite_cache_);
+
+                sprite_cache_.Clear();
+
+                sbuilder_.AddNewline();
+                sbuilder_.AddNewline();
             }
             return sbuilder_.CurrPos;
         }

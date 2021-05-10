@@ -48,18 +48,27 @@ namespace IngameScript
                     origin_ = parent.CurrPos;
                 }
 
-                public MySprite Make(int width)
+                public void Make(ref MySpriteDrawFrame to, int width, int line_width)
                 {
                     var size = new RectangleF(origin_, new Vector2( width, parent_.CurrPos.Y - origin_.Y));
-                    return new MySprite
-                    {
-                        Type = SpriteType.TEXTURE,
-                        Data = "SquareHollow",
-                        Size = size.Size,
-                        Position = size.Center,
-                        Alignment = TextAlignment.CENTER,
-                        Color = Color.Aqua.Alpha(0.8f),
-                    };
+
+                    /*to.Add(parent_.MakeRect( // Left
+                        start: origin_,
+                        end: new Vector2(origin_.X + line_width, parent_.CurrPos.Y))
+                        );
+                    to.Add(parent_.MakeRect( // Top
+                        start: origin_,
+                        end: new Vector2(origin_.X + width, origin_.Y + line_width)
+                        ));*/
+                    to.Add(parent_.MakeRect( // Right
+                        start: new Vector2(origin_.X + width - line_width, origin_.Y),
+                        end: new Vector2(origin_.X + width, parent_.CurrPos.Y)
+                        )); 
+                    /*to.Add(parent_.MakeRect( // Bottom
+                        start: origin_,
+                        end: new Vector2(origin_.X + width, origin_.Y + line_width)
+                        ));*/
+
 
                 }
             }
@@ -87,6 +96,21 @@ namespace IngameScript
             public void AddNewline()
             {
                 CurrPos.Y += NEWLINE_HEIGHT;
+            }
+            public MySprite MakeRect(Vector2 start, Vector2 end, Color? fg = null)
+            {
+                var rect = new RectangleF(start, end - start);
+                var colour = fg ?? Color.White;
+                return new MySprite
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Color = colour,
+                    Size = rect.Size,
+                    Position = rect.Center,
+                    Alignment = TextAlignment.CENTER,
+
+                };
             }
             public MySprite MakeBulletPt(Color? fg = null)
             {
