@@ -1,5 +1,65 @@
 ﻿R e a d m e
 -----------
 
-In this file you can include any instructions or other comments you want to have injected onto the 
-top of your final script. You can safely delete this file if you do not want any such comments.
+## Setup
+
+1. Add your the value of lcd tag to the name of an lcd or block with lcd screen (e.g. cockpit). By default this is [AmmoMgrLCD] but you can 
+	configure this as well
+2. If you just want weapons summary, you are now done. Read on to find out how to customise what is displayed further
+
+## Config options
+This script can NOT be configured by editing any variables directly. Read on to find out how to configure it properly
+
+### Per LCD
+
+Configuration is done per surface via the block's custom data. To configure a specific surface 
+do [AmmoMgr N] where N is the number of the surface. For example, for a standard LCD panel you need to write 
+
+[AmmoMgr 0]
+// Config goes here 
+
+For a the fighter cockpit you would write 
+
+[AmmoMgr 0]
+// Center screen config 
+
+[AmmoMgr 1]
+// Bottom left screen config 
+
+etc
+
+The script will automagically write out the headers for each of your surfaces but you need to fill in the rest (if you want to change the config) 
+that is, it will work without touching the custom data.
+
+The config options are as follows: 
+- type: Can be one of 
+	- Weapons: Shows a summary of all weapons 
+	- Containers: Shows a summary of all containers
+	- All: Shows a summary of both containers and weapons
+	- Engaged: Shows a summary of weapons currently engaged (i.e. firing or targeting)
+- group: Full (case sensative) name of a group to filter by, only blocks in that group will be shown 
+- offset x: Offset for the display in pixels, right is positive, left is negative
+- offset y: Offset for the display in pixels, down is positive, up is negative
+- scale: Scale of the display. Can be a decimal
+- scroll: true or false, whether to scroll the display if all the contents cannot fit in the viewport
+- oneline: true or false, whether to show the summary in a condensed one line per entry view. This view hides ammo breakdowns and only 
+			shows the block name and fill level 
+- hide empty: true or false, whether to hide ammo entries where there is no ammo of that type in the block (without this, large containers will show
+				every ammo in your world)
+
+### Per Programmable Block 
+
+The CustomData of the programmable block this script is installed on can be used for additional configuration. The section name is
+AmmoMgr, e.g. 
+[AmmoMgr]
+// Config 
+
+
+The current options are:
+
+- lcd tag: Tag to use for LCD panels for displaying status. Defaults to [AmmoMgrLCD]
+	
+
+
+
+

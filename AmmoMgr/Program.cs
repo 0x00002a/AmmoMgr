@@ -366,7 +366,8 @@ namespace IngameScript
         }
         internal bool IsValidInventory(IMyInventory inv)
         {
-            return inv.Owner is IMyTerminalBlock && CanContainAmmo(inv);
+            var parent = inv.Owner as IMyTerminalBlock;
+            return parent != null && CanContainAmmo(inv) && Me.IsSameConstructAs(parent);
         }
         internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin, HashSet<IMyInventory> parition)
         {
@@ -532,10 +533,7 @@ namespace IngameScript
             }
 
         }
-        internal void MarkInvCacheOutdated()
-        {
-            
-        }
+        
 
 
         #endregion
@@ -604,7 +602,6 @@ namespace IngameScript
 
                 try
                 {
-
                     if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
                     {
                         ++ticks_10;
