@@ -9,11 +9,11 @@ all your weapons ammo levels with pretty progress bars and colours!
 ## Features 
 
 - Equalizes ammo between all connected weapons. e.g. if there are 50 NATO cases and 2 connected turrets, each will get 25 cases
-- Works on a per network basis, if there are 50 NATO cases and 5 turrets but only 2 turrets are connected to each other, one of which has all the ammo, both turrets get 25 and the others get 0)
+- Works on a per network basis, if there are 50 NATO cases and 5 turrets but only 2 turrets are connected to each other, one of which has all the ammo, both of the connected turrets get 25 and the others get 0
 - Works on a per ammo basis. Meaning if there are 2 missile turrets and 2 gatling turrets on the same network, with 20 missiles, the missile turrets each get 10 (rather than 5)
 - Diverts ammo from inactive weapons toward currently engaged weapons. Even if you're running a little low on ammo, your hot weapons will keep shooting until the very end
 - Works with WeaponCore or Vanilla turrets (although mostly tested with WeaponCore)
-- Lots of pretty display options with ammo and fill level stats for containers, weapons, or both, as well as single-line versions for quick combat checks 
+- Lots of pretty (imo) display options with ammo and fill level stats for containers, weapons, or both, as well as single-line versions for quick combat checks 
 
 ### Configuration 
 
@@ -53,3 +53,14 @@ for your script to be yeeted if you have reused my script without obeying the li
 
 The full source code for this script can be found here: https://github.com/0x00002a/DeadlyAccel
 
+### MDK 
+
+This script is developed and deployed using the [MDK](https://github.com/malware-dev/MDK-SE). If you wanna get into SE scripting, check it out. Also check out the Keen Discord, lots of 
+helpful people on there.
+
+### Stuff used in screenshots 
+
+- [Whips TBR](https://steamcommunity.com/sharedfiles/filedetails/?id=1707280190)
+- [Whips Artificial Horizon](https://steamcommunity.com/sharedfiles/filedetails/?id=1721247350)
+- [Automatic LCDs 2](https://steamcommunity.com/sharedfiles/filedetails/?id=822950976)
+- [Adjustable LCDs](https://steamcommunity.com/sharedfiles/filedetails/?id=2427400629) (mine)

@@ -5,7 +5,17 @@ VisualStudioVersion = 16.0.31112.23
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmmoMgr", "AmmoMgr\AmmoMgr.csproj", "{D40950B1-191D-4267-AE72-66E90389F20B}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "WcPbApi", "D:\Users\Ash\source\repos\WcPbApi\WcPbApi.shproj", "{59C86C49-93C2-40B8-841B-F1DAF7210810}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "SEIOUtils", "D:\Users\Ash\source\repos\SEIOUtils\SEIOUtils.shproj", "{AAE2A7FC-84E5-4B07-B40D-6119F4717573}"
+EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		D:\Users\Ash\source\repos\WcPbApi\WcPbApi.projitems*{59c86c49-93c2-40b8-841b-f1daf7210810}*SharedItemsImports = 13
+		D:\Users\Ash\source\repos\SEIOUtils\SEIOUtils.projitems*{aae2a7fc-84e5-4b07-b40d-6119f4717573}*SharedItemsImports = 13
+		D:\Users\Ash\source\repos\SEIOUtils\SEIOUtils.projitems*{d40950b1-191d-4267-ae72-66e90389f20b}*SharedItemsImports = 4
+		D:\Users\Ash\source\repos\WcPbApi\WcPbApi.projitems*{d40950b1-191d-4267-ae72-66e90389f20b}*SharedItemsImports = 4
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 	EndGlobalSection
