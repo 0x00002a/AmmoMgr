@@ -1,4 +1,24 @@
-﻿using Sandbox.Game.EntityComponents;
+﻿/*
+    AmmoMgr Space Engineers Script.
+    Copyright (C) 2021 Natasha England-Elbro
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+
+
+using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 using SpaceEngineers.Game.ModAPI.Ingame;
@@ -60,7 +80,7 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.4.0";
+        internal const string VERSION = "0.4.1";
         #endregion
 
         #region Fields
@@ -75,6 +95,7 @@ namespace IngameScript
         internal Dictionary<IMyInventory, bool> cache_outdated_lookup_ = new Dictionary<IMyInventory, bool>();
         internal List<IMyInventory> outdated_inv_store_ = new List<IMyInventory>();
         internal List<MySprite> sprite_cache_ = new List<MySprite>();
+        internal List<IMyInventory> flat_inv_cache_ = new List<IMyInventory>();
         internal StringBuilder lcd_data_cache_ = new StringBuilder();
         internal MyIni status_lcd_parser_ = new MyIni();
         internal WcPbApi wc_;
@@ -399,14 +420,19 @@ namespace IngameScript
 
         internal void RefreshInventories(List<HashSet<IMyInventory>> readin)
         {
-            var block_cache = new List<IMyTerminalBlock>();
-            GridTerminalSystem.GetBlocks(block_cache);
+            flat_inv_cache_.Clear();
+            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, b => {
+                if (b.HasInventory)
+                {
+                    flat_inv_cache_.Add(b.GetInventory());
+                }
+                return false;
+            });
 
 
-            var flat_inventories = block_cache.Where(b => b.HasInventory).Select(b => b.GetInventory()).ToList();
-            foreach(var inv in flat_inventories)
+            foreach(var inv in flat_inv_cache_)
             {
-                AddInventory(inv, flat_inventories, readin, null);
+                AddInventory(inv, flat_inv_cache_, readin, null);
             }
             
         }
