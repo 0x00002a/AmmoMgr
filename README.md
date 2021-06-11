@@ -3,7 +3,7 @@
 ## Introduction 
 
 Weapons kinda suck at sharing ammo, in the event that one of them actually draws ammo from any containers you just know its gonna hog it all rather than sharing. This script 
-does a robin hood - yoinks its excess its ammo and shares it between all other weapons on the same network. Sound cool? That's not all my friend, it also prints the 
+does a robin hood - yoinks its excess its ammo and shares it between all other weapons on the same network. Sound cool? That's not all my friend, it also displays 
 all your weapons ammo levels with pretty progress bars and colours!
 
 ## Features 
@@ -19,7 +19,7 @@ all your weapons ammo levels with pretty progress bars and colours!
 
 If you just want the ammo balancing part, no configuration is needed, just slap it in a PB and forget about it.
 
-This mods config for displaying on LCDs is a bit involved, see the top of the script for detailed instructions.
+This scripts config for displaying on LCDs is a bit involved, see the top of the script for detailed instructions.
 
 ### Docking via connectors
 
