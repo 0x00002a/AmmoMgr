@@ -51,7 +51,7 @@ for your script to be yeeted if you have reused my script without obeying the li
 
 ### Source
 
-The full source code for this script can be found here: https://github.com/0x00002a/DeadlyAccel
+The full source code for this script can be found here: https://github.com/0x00002a/AmmoMgr
 
 ### MDK 
 
