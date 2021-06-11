@@ -637,7 +637,7 @@ namespace IngameScript
         {
             ParseConfig();
             var wc = new WcPbApi();
-            if (!wc.Activate(Me))
+            if (!wc.Activate(Me)) // Note: This is a modified WC bridge in order to get this to work (and not throw)
             {
                 console.Persistout.WriteLn($"Failed to initalise WeaponCore, falling back to vanilla only");
             } else
