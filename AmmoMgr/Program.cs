@@ -24,7 +24,6 @@ using SpaceEngineers.Game.ModAPI.Ingame;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using VRage;
@@ -79,7 +78,9 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.4.1";
+        internal const string VERSION = "0.4.2";
+
+        internal const int MAX_REBALANCE_TICKS = 60; // Increase this to slowdown the script and maybe improve perf with _lots_ of inventories
         #endregion
 
         #region Fields
@@ -100,6 +101,8 @@ namespace IngameScript
         internal WcPbApi wc_;
         internal SpriteBuilder sbuilder_ = new SpriteBuilder();
         internal string lcd_tag_;
+        internal uint ticks_per_inv_refresh_ = 1200; // Every 2 minutes
+        internal ulong tick_ = 0;
 
         #region Ini Keys 
         internal const string INI_SECT_NAME = "AmmoMgr";
@@ -128,6 +131,7 @@ namespace IngameScript
 
         internal static void SortItems(IMyInventory parent, List<MyInventoryItem> items, Dictionary<string, List<AmmoItemData>> readin)
         {
+            
             foreach(var item in items)
             {
                 if (IsAmmo(item.Type))
@@ -237,7 +241,6 @@ namespace IngameScript
             wc.GetAllCoreStaticLaunchers(readin);
             wc.GetAllCoreTurrets(readin);
             wc.GetAllCoreWeapons(readin);
-
         }
         internal void ScanForLCDs(Dictionary<StatusLCDData, List<IMyTextSurface>> readin)
         {
@@ -389,89 +392,112 @@ namespace IngameScript
             var parent = inv.Owner as IMyTerminalBlock;
             return parent != null && CanContainAmmo(inv) && Me.IsSameConstructAs(parent);
         }
-        internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin, HashSet<IMyInventory> parition)
+        HashSet<IMyInventory> checked_cache_ = new HashSet<IMyInventory>();
+        internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin)
         {
-            if (IsValidInventory(inv))
+            if (!checked_cache_.Contains(inv))
             {
-                if (parition == null)
-                {
-                    parition = readin.FirstOrDefault(set => set.Contains(inv));
+                checked_cache_.Add(inv);
+                var partition = readin.FirstOrDefault(set => set.Contains(inv));
 
-                    if (parition == null)
-                    {
-                        parition = new HashSet<IMyInventory>();
-                        readin.Add(parition);
-                    }
+                if (partition == null)
+                {
+                    partition = new HashSet<IMyInventory>();
+                    readin.Add(partition);
                 }
 
-                parition.Add(inv);
+                partition.Add(inv);
                 cache_outdated_lookup_[inv] = false;
 
                 foreach (var peer in all)
                 {
-                    if (inv.IsConnectedTo(peer) && IsValidInventory(peer))
+                    if (!checked_cache_.Contains(peer) && !partition.Contains(peer) && inv.IsConnectedTo(peer))
                     {
-                        parition.Add(peer);
+                        partition.Add(peer);
+                        checked_cache_.Add(peer);
                     }
                 }
             }
         }
 
-        internal void RefreshInventories(List<HashSet<IMyInventory>> readin)
+        internal IEnumerator<bool> RefreshInventories(List<HashSet<IMyInventory>> readin)
         {
+            RemoveOutdatedInvs();
             flat_inv_cache_.Clear();
             GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, b => {
-                if (b.HasInventory)
+                if (b.HasInventory && IsValidInventory(b.GetInventory()))
                 {
                     flat_inv_cache_.Add(b.GetInventory());
                 }
                 return false;
             });
 
+           
 
+            checked_cache_.Clear();
             foreach(var inv in flat_inv_cache_)
             {
-                AddInventory(inv, flat_inv_cache_, readin, null);
+                AddInventory(inv, flat_inv_cache_, readin);
+                yield return false; // Uncapped execution ticks, because IsConnectedTo is expensive apparently 
             }
+
+            yield break;
             
         }
         internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, HashSet<IMyInventory> requesters)
         {
-            
-            var aval_head = 0;
-            foreach(var inv in requesters)
+
+            if (avaliable.Count == 0)
             {
+                return;
+            }
+
+            var ammo_t = avaliable[0].Item.Type;
+
+            var aval_head = 0;
+            foreach (var inv in requesters)
+            {
+                var to_block = inv.Owner as IMyTerminalBlock;
                 var needed = per_inv;
-                for (var i = aval_head; i < avaliable.Count; ++i)
+                if (
+                   (to_block != null && to_block.IsWorking)
+                && ((double)inv.GetItemAmount(ammo_t) < per_inv)
+                && CanContainItem(inv, ammo_t)
+                )
                 {
-                    var target_item = avaliable[i];
-                    var from_inv = target_item.Parent;
-                    var to_block = inv.Owner as IMyTerminalBlock;
-                    if (
-                        CanContainItem(inv, target_item.Item.Type)
-                        && (to_block != null && to_block.IsWorking)
-                        && IsSameOrHigherPriority(inv, from_inv) 
-                        && ((double)inv.GetItemAmount(target_item.Item.Type) < per_inv)
-                        && from_inv.IsConnectedTo(inv) 
-                        && (PriorityFor(from_inv) < PriorityFor(inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) > per_inv))
+                    for (var i = aval_head; i < avaliable.Count; ++i)
                     {
-                        var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
-                        inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-                        actions_log_.Add($"{OwnerName(target_item.Parent)} -> {OwnerName(inv)} ({target_item.Item.Type.SubtypeId}) ({aval}) ");
-
-                        needed -= aval;
-                        if (needed > 0)
+                        var target_item = avaliable[i];
+                        if (ammo_t != target_item.Item.Type)
                         {
-                            ++aval_head;
+                            throw new Exception("All avaliable must have same ammo type");
                         }
-                        else
+
+                        var from_inv = target_item.Parent;
+                        if (
+                            IsSameOrHigherPriority(inv, from_inv)
+                            && (PriorityFor(from_inv) < PriorityFor(inv) || (double)from_inv.GetItemAmount(target_item.Item.Type) > per_inv)
+                            && from_inv.IsConnectedTo(inv)
+                            )
                         {
-                            break;
+                            var aval = Math.Min(needed, (double)target_item.Item.Amount);
+
+                            inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
+                            actions_log_.Add($"{OwnerName(target_item.Parent)} -> {OwnerName(inv)} ({target_item.Item.Type.SubtypeId}) ({aval}) ");
+
+                            needed -= aval;
+                            if (needed > 0)
+                            {
+                                ++aval_head;
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                     }
                 }
-
             }
         }
 
@@ -480,8 +506,32 @@ namespace IngameScript
             return src.Where(i => CanContainItem(i, type));
         }
 
-        internal void RebalanceInventories(List<HashSet<IMyInventory>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        private double CalcPerInv(MyItemType ammo_t, HashSet<IMyInventory> inv_system)
         {
+            var nb_req = 0;
+            var total_qty = 0.0;
+            foreach (var inv in inv_system)
+            {
+                if (CanContainItem(inv, ammo_t))
+                {
+                    if (IsRequester(inv))
+                    {
+                        ++nb_req;
+                    }
+                    total_qty += (double)inv.GetItemAmount(ammo_t);
+                }
+            }
+
+            var per_inv = Math.Floor(Math.Round(total_qty / nb_req, 1));
+
+            return per_inv;
+
+        }
+
+        internal IEnumerator<bool> RebalanceInventories(List<HashSet<IMyInventory>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        {
+            var per_yield = MAX_REBALANCE_TICKS / (double)requesters.Count;
+            var since_yield = 0.0;
             foreach (var ammo in avaliable)
             {
                 if (ammo.Value.Count != 0)
@@ -489,16 +539,14 @@ namespace IngameScript
 
                     foreach (var inv_system in requesters)
                     {
-                        var ammo_t = ammo.Value[0].Item.Type;
-                        var eligable_invs = inv_system.Where(i => CanContainItem(i, ammo_t));
-                        var nb_req = eligable_invs.Count(IsRequester);
-                        var total = eligable_invs.Select(i => (double)i.GetItemAmount(ammo_t)).Sum();
-                        var per_inv = total / nb_req;
-
-                        per_inv = Math.Floor(Math.Round(per_inv, 1));
-
+                        if (since_yield >= 1.0)
+                        {
+                            since_yield = 0;
+                            yield return false;
+                        }
+                        since_yield += per_yield;
+                        var per_inv = CalcPerInv(ammo.Value[0].Item.Type, inv_system);
                         AllotItems(per_inv, ammo.Value, inv_system);
-
                     }
                 }
 
@@ -507,18 +555,18 @@ namespace IngameScript
 
         }
 
+        readonly List<MyInventoryItem> items_tmp_ = new List<MyInventoryItem>();
         internal void ScanInventories(List<HashSet<IMyInventory>> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
-            var items_tmp = new List<MyInventoryItem>();
             foreach(var part in inventories)
             {
                 foreach (var inv in part)
                 {
                     cache_outdated_lookup_[inv] = true;
-                    items_tmp.Clear();
-                    inv.GetItems(items_tmp);
+                    items_tmp_.Clear();
+                    inv.GetItems(items_tmp_);
 
-                    SortItems(inv, items_tmp, readin);
+                    SortItems(inv, items_tmp_, readin);
                 }
 
             }
@@ -600,7 +648,8 @@ namespace IngameScript
             }
             ScanForLCDs(status_lcds_);
             ScanGroups();
-            
+
+            sm_instructions_.Enqueue(RefreshInventories(partitioned_invs_));
 
             Runtime.UpdateFrequency = UpdateFrequency.Update10 | UpdateFrequency.Once;
 
@@ -615,6 +664,17 @@ namespace IngameScript
             // This method is optional and can be removed if not
             // needed.
         }
+        readonly Queue<IEnumerator<bool>> sm_instructions_ = new Queue<IEnumerator<bool>>();
+
+        private IEnumerator<bool> Tickover()
+        {
+            actions_log_.Clear();
+            ClearLists(avaliability_lookup_);
+            ScanInventories(partitioned_invs_, avaliability_lookup_);
+
+            return RebalanceInventories(partitioned_invs_, avaliability_lookup_);
+
+        }
 
         public void Main(string argument, UpdateType updateSource)
         {
@@ -627,26 +687,38 @@ namespace IngameScript
 
                 try
                 {
+                    ++tick_;
                     if ((updateSource & UpdateType.Update10) == UpdateType.Update10)
                     {
-                        ++ticks_10;
 
                         DrawStatus();
                         RefreshTargetingStatus();
                     }
 
                     var is_oneshot = (updateSource & UpdateType.Once) == UpdateType.Once;
-                    if (is_oneshot || ticks_10 % 12 == 0) // Do a rescan every 2 seconds 
+                    if (is_oneshot && sm_instructions_.Count != 0)
                     {
-                        RefreshInventories(partitioned_invs_);
-                        RemoveOutdatedInvs();
+
+                        var curr = sm_instructions_.Peek();
+                        if (curr.MoveNext())
+                        {
+                        } else
+                        {
+                            sm_instructions_.Dequeue().Dispose();
+                        }
+                        Runtime.UpdateFrequency |= UpdateFrequency.Once;
+
                     }
-                    else if (ticks_10 % 3 == 0)
+                    if (sm_instructions_.Count == 0)
                     {
-                        actions_log_.Clear();
-                        ClearLists(avaliability_lookup_);
-                        ScanInventories(partitioned_invs_, avaliability_lookup_);
-                        RebalanceInventories(partitioned_invs_, avaliability_lookup_);
+                        sm_instructions_.Enqueue(Tickover());
+                        Runtime.UpdateFrequency |= UpdateFrequency.Once;
+                    }
+
+                    if (tick_ % ticks_per_inv_refresh_ == 0 && sm_instructions_.Count <= 1)
+                    {
+                        sm_instructions_.Enqueue(RefreshInventories(partitioned_invs_));
+                        Runtime.UpdateFrequency |= UpdateFrequency.Once;
                     }
 
                     WriteStatsToStdout();
