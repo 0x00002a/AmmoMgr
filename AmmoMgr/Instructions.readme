@@ -60,6 +60,9 @@ The current options are:
 - lcd tag: Tag to use for LCD panels for displaying status. Defaults to [AmmoMgrLCD]
 	
 
+### Compatability with Isy's Inventory management script 
 
+This script will fight the management script by default. You can fix this by adding "Locked" to the name of 
+each weapon (e.g. with a renamer script). This will prevent Isy's from pulling items out of the block. 
 
 

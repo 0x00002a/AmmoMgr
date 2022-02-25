@@ -17,6 +17,7 @@
 */
 
 
+using Sandbox.Game;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
@@ -35,6 +36,7 @@ using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Game.ObjectBuilders.Definitions;
 using VRageMath;
+using CoreSystems.Api;
 
 namespace IngameScript
 {
@@ -75,12 +77,21 @@ namespace IngameScript
             public bool HideZeroEntries;
         }
 
+        internal enum ExecutionPoint
+        {
+            Rebalancing, 
+            Scanning,
+
+        }
+
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.4.2";
+        internal const string VERSION = "0.5.1";
 
         internal const int MAX_REBALANCE_TICKS = 60; // Increase this to slowdown the script and maybe improve perf with _lots_ of inventories
+        internal const int TICKS_PER_COMP_UPDATE = 30;
+        internal int max_comp_since_ticks_ = 0;
         #endregion
 
         #region Fields
@@ -373,10 +384,20 @@ namespace IngameScript
         #region Running
         internal void WriteStatsToStdout()
         {
-
+            var complexity = Runtime.CurrentInstructionCount;
+          
+            if (max_comp_since_ticks_ < complexity)
+            {
+                max_comp_since_ticks_ = complexity;
+            }
+            console.Stdout.WriteLn($"Complexity: {max_comp_since_ticks_} / {Runtime.MaxInstructionCount}");
             foreach(var act in actions_log_)
             {
                 console.Stdout.WriteLn(act);
+            }
+            if (tick_ % TICKS_PER_COMP_UPDATE == 0)
+            {
+                max_comp_since_ticks_ = 0;
             }
 
         }
