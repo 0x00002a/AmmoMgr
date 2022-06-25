@@ -87,7 +87,7 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.5.1";
+        internal const string VERSION = "0.5.2";
 
         internal const int MAX_REBALANCE_TICKS = 60; // Increase this to slowdown the script and maybe improve perf with _lots_ of inventories
         internal const int TICKS_PER_COMP_UPDATE = 30;
