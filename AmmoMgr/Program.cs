@@ -505,7 +505,6 @@ namespace IngameScript
                             var aval = Math.Min(needed, (double)target_item.Item.Amount);
 
                             inv.TransferItemFrom(target_item.Parent, target_item.Item, (MyFixedPoint)aval);
-                            actions_log_.Add($"{OwnerName(target_item.Parent)} -> {OwnerName(inv)} ({target_item.Item.Type.SubtypeId}) ({aval}) ");
 
                             needed -= aval;
                             if (needed > 0)
