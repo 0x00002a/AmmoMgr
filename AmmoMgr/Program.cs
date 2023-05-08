@@ -210,7 +210,8 @@ namespace IngameScript
        
         internal bool CanContainAmmo(IMyInventory inv)
         {
-            return AcceptedItems(inv).Any(i => IsAmmo(i));
+            AcceptedItems(inv); // populate cache if not already
+            return inv_allowlist_cache_[inv].Count > 0;
         }
         
         internal bool IsRequester(IMyInventory inv)
@@ -413,7 +414,7 @@ namespace IngameScript
         internal bool IsValidInventory(IMyInventory inv)
         {
             var parent = inv.Owner as IMyTerminalBlock;
-            return parent != null && CanContainAmmo(inv) && Me.IsSameConstructAs(parent);
+            return parent != null && Me.IsSameConstructAs(parent) && CanContainAmmo(inv);
         }
         HashSet<IMyInventory> checked_cache_ = new HashSet<IMyInventory>();
         internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin)
