@@ -5,10 +5,10 @@
     You can safely exclude this file from code repositories and use different 
     user settings per machine.
     -->
-    <MDKVersion>1.4.7</MDKVersion>
+    <MDKVersion>1.4.14</MDKVersion>
     <MDKUseGameBinPath>no</MDKUseGameBinPath>
-    <MDKGameBinPath>C:\Games\Steam\SteamApps\common\SpaceEngineers\Bin64</MDKGameBinPath>
-    <MDKInstallPath>c:\users\nat\appdata\local\microsoft\visualstudio\16.0_86a27312\extensions\ibhmkmsj.hyx</MDKInstallPath>
+    <MDKGameBinPath>F:\Games\Steam\SteamApps\common\SpaceEngineers\Bin64</MDKGameBinPath>
+    <MDKInstallPath>c:\users\nat\appdata\local\microsoft\visualstudio\17.0_279935f5\extensions\lf00dck5.qg0</MDKInstallPath>
     <MDKOutputPath>C:\Users\Nat\AppData\Roaming\SpaceEngineers\IngameScripts\local</MDKOutputPath>
   </PropertyGroup>
   <ItemGroup>
@@ -71,6 +71,10 @@
     <Reference Include="MDKUtilities">
       <HintPath>$(MDKInstallPath)\MDKUtilities.dll</HintPath>
       <Private>true</Private>
+    </Reference>
+    <Reference Include="System.Collections.Immutable">
+      <HintPath>$(MDKGameBinPath)\System.Collections.Immutable.dll</HintPath>
+      <Private>false</Private>
     </Reference>
     <Analyzer Include="$(MDKInstallPath)\Analyzers\MDKAnalyzer.dll" />
   </ItemGroup>

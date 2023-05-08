@@ -87,7 +87,7 @@ namespace IngameScript
 
         #region Constants
         internal const string AMMO_TYPE_NAME = "MyObjectBuilder_AmmoMagazine";
-        internal const string VERSION = "0.5.2";
+        internal const string VERSION = "0.5.3";
 
         internal const int MAX_REBALANCE_TICKS = 60; // Increase this to slowdown the script and maybe improve perf with _lots_ of inventories
         internal const int TICKS_PER_COMP_UPDATE = 30;
@@ -390,6 +390,8 @@ namespace IngameScript
             {
                 max_comp_since_ticks_ = complexity;
             }
+            console.Stdout.WriteLn($"Status displays: {status_lcds_.Count}");
+            console.Stdout.WriteLn($"Inventories: {flat_inv_cache_.Count}");
             console.Stdout.WriteLn($"Complexity: {max_comp_since_ticks_} / {Runtime.MaxInstructionCount}");
             foreach(var act in actions_log_)
             {
@@ -445,14 +447,23 @@ namespace IngameScript
         {
             RemoveOutdatedInvs();
             flat_inv_cache_.Clear();
-            GridTerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, b => {
-                if (b.HasInventory && IsValidInventory(b.GetInventory()))
+            var cache = new List<IMyTerminalBlock>();
+            GridTerminalSystem.GetBlocksOfType(cache);
+            var partSize = 100;
+            var parts = Math.Ceiling((double)cache.Count / (double)partSize);
+            for (var n = 0; n < parts; n++)
+            {
+                var max = Math.Min((n + 1) * partSize, cache.Count);
+                for (var i = n * partSize; i < max; i++)
                 {
-                    flat_inv_cache_.Add(b.GetInventory());
+                    var b = cache[i];
+                    if (b.HasInventory && IsValidInventory(b.GetInventory()))
+                    {
+                        flat_inv_cache_.Add(b.GetInventory());
+                    }
                 }
-                return false;
-            });
-
+                yield return false;
+            }
            
 
             checked_cache_.Clear();
@@ -674,6 +685,7 @@ namespace IngameScript
             }
             ScanForLCDs(status_lcds_);
             ScanGroups();
+            console.Persistout.WriteLn($"Status displays: {status_lcds_.Count}");
 
             sm_instructions_.Enqueue(RefreshInventories(partitioned_invs_));
 
