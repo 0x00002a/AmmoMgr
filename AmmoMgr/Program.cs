@@ -393,6 +393,7 @@ namespace IngameScript
             }
             console.Stdout.WriteLn($"Status displays: {status_lcds_.Count}");
             console.Stdout.WriteLn($"Inventories: {flat_inv_cache_.Count}");
+            console.Stdout.WriteLn($"Groups: {partitioned_invs_.Count}");
             console.Stdout.WriteLn($"Complexity: {max_comp_since_ticks_} / {Runtime.MaxInstructionCount}");
             foreach(var act in actions_log_)
             {
@@ -443,6 +444,13 @@ namespace IngameScript
                 }
             }
         }
+        internal void CullWeaponlessGroups(List<HashSet<IMyInventory>> groups)
+        {
+            groups.RemoveAll(group =>
+            {
+                return group.All(inv => !IsWeapon((IMyTerminalBlock)inv.Owner));
+            });
+        }
 
         internal IEnumerator<bool> RefreshInventories(List<HashSet<IMyInventory>> readin)
         {
@@ -450,29 +458,27 @@ namespace IngameScript
             flat_inv_cache_.Clear();
             var cache = new List<IMyTerminalBlock>();
             GridTerminalSystem.GetBlocksOfType(cache);
-            var partSize = 100;
-            var parts = Math.Ceiling((double)cache.Count / (double)partSize);
-            for (var n = 0; n < parts; n++)
+            foreach (var b in Schedular.DistributeForEach(cache, 100, b =>
             {
-                var max = Math.Min((n + 1) * partSize, cache.Count);
-                for (var i = n * partSize; i < max; i++)
+                if (b.HasInventory && IsValidInventory(b.GetInventory()))
                 {
-                    var b = cache[i];
-                    if (b.HasInventory && IsValidInventory(b.GetInventory()))
-                    {
-                        flat_inv_cache_.Add(b.GetInventory());
-                    }
+                    flat_inv_cache_.Add(b.GetInventory());
                 }
+            }))
+            {
                 yield return false;
             }
            
 
             checked_cache_.Clear();
-            foreach(var inv in flat_inv_cache_)
+            foreach (var b in Schedular.DistributeForEach(flat_inv_cache_, 25, inv =>
             {
                 AddInventory(inv, flat_inv_cache_, readin);
-                yield return false; // Uncapped execution ticks, because IsConnectedTo is expensive apparently 
+            }))
+            {
+                yield return false;
             }
+            CullWeaponlessGroups(partitioned_invs_);
 
             yield break;
             

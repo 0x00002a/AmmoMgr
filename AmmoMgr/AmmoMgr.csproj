@@ -52,6 +52,7 @@
     <AdditionalFiles Include="Instructions.readme" />
     <AdditionalFiles Include="thumb.png" />
     <AdditionalFiles Include="MDK\whitelist.cache" />
+    <Compile Include="Schedular.cs" />
     <Compile Include="UI\SpriteBuilder.cs" />
   </ItemGroup>
   <Import Project="D:\Users\Ash\source\repos\WcPbApi\WcPbApi.projitems" Label="Shared" />
