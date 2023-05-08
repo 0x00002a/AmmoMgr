@@ -90,6 +90,8 @@ namespace IngameScript
         internal const string VERSION = "0.5.3";
 
         internal const int MAX_REBALANCE_TICKS = 60; // Increase this to slowdown the script and maybe improve perf with _lots_ of inventories
+        internal const uint INVENTORY_GROUPING_BATCH_SIZE = 25; // Controls how many inventories are grouped per tick during scan, lowering may fix too complex errors
+        internal const uint INVENTORY_FILTER_BATCH_SIZE = 100; // Controls how many inventories are filtered per tick during scan, lowering may fix too complex errors
         internal const int TICKS_PER_COMP_UPDATE = 30;
         internal int max_comp_since_ticks_ = 0;
         #endregion
@@ -458,7 +460,7 @@ namespace IngameScript
             flat_inv_cache_.Clear();
             var cache = new List<IMyTerminalBlock>();
             GridTerminalSystem.GetBlocksOfType(cache);
-            foreach (var b in Schedular.DistributeForEach(cache, 100, b =>
+            foreach (var b in Schedular.DistributeForEach(cache, INVENTORY_FILTER_BATCH_SIZE, b =>
             {
                 if (b.HasInventory && IsValidInventory(b.GetInventory()))
                 {
@@ -471,7 +473,7 @@ namespace IngameScript
            
 
             checked_cache_.Clear();
-            foreach (var b in Schedular.DistributeForEach(flat_inv_cache_, 25, inv =>
+            foreach (var b in Schedular.DistributeForEach(flat_inv_cache_, INVENTORY_GROUPING_BATCH_SIZE, inv =>
             {
                 AddInventory(inv, flat_inv_cache_, readin);
             }))
@@ -692,7 +694,6 @@ namespace IngameScript
             }
             ScanForLCDs(status_lcds_);
             ScanGroups();
-            console.Persistout.WriteLn($"Status displays: {status_lcds_.Count}");
 
             sm_instructions_.Enqueue(RefreshInventories(partitioned_invs_));
 
