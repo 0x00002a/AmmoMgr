@@ -90,7 +90,7 @@ namespace IngameScript
         internal const string VERSION = "0.5.3";
 
         internal const int MAX_REBALANCE_TICKS = 60; // Increase this to slowdown the script and maybe improve perf with _lots_ of inventories
-        internal const uint INVENTORY_GROUPING_BATCH_SIZE = 25; // Controls how many inventories are grouped per tick during scan, lowering may fix too complex errors
+        internal const uint INVENTORY_GROUPING_BATCH_SIZE = 100; // Controls how many inventories are grouped per tick during scan, lowering may fix too complex errors
         internal const uint INVENTORY_FILTER_BATCH_SIZE = 100; // Controls how many inventories are filtered per tick during scan, lowering may fix too complex errors
         internal const int TICKS_PER_COMP_UPDATE = 30;
         internal int max_comp_since_ticks_ = 0;
@@ -116,6 +116,7 @@ namespace IngameScript
         internal string lcd_tag_;
         internal uint ticks_per_inv_refresh_ = 1200; // Every 2 minutes
         internal ulong tick_ = 0;
+        internal int flat_inventories_ = 0;
 
         #region Ini Keys 
         internal const string INI_SECT_NAME = "AmmoMgr";
@@ -394,7 +395,7 @@ namespace IngameScript
                 max_comp_since_ticks_ = complexity;
             }
             console.Stdout.WriteLn($"Status displays: {status_lcds_.Count}");
-            console.Stdout.WriteLn($"Inventories: {flat_inv_cache_.Count}");
+            console.Stdout.WriteLn($"Inventories: {flat_inventories_}");
             console.Stdout.WriteLn($"Groups: {partitioned_invs_.Count}");
             console.Stdout.WriteLn($"Complexity: {max_comp_since_ticks_} / {Runtime.MaxInstructionCount}");
             foreach(var act in actions_log_)
@@ -419,33 +420,6 @@ namespace IngameScript
             var parent = inv.Owner as IMyTerminalBlock;
             return parent != null && Me.IsSameConstructAs(parent) && CanContainAmmo(inv);
         }
-        HashSet<IMyInventory> checked_cache_ = new HashSet<IMyInventory>();
-        internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<List<IMyInventory>> readin)
-        {
-            if (!checked_cache_.Contains(inv))
-            {
-                checked_cache_.Add(inv);
-                var partition = readin.FirstOrDefault(set => set.Contains(inv));
-
-                if (partition == null)
-                {
-                    partition = new List<IMyInventory>();
-                    readin.Add(partition);
-                }
-
-                partition.Add(inv);
-                cache_outdated_lookup_[inv] = false;
-
-                foreach (var peer in all)
-                {
-                    if (!checked_cache_.Contains(peer) && !partition.Contains(peer) && inv.IsConnectedTo(peer))
-                    {
-                        partition.Add(peer);
-                        checked_cache_.Add(peer);
-                    }
-                }
-            }
-        }
         internal void CullWeaponlessGroups(List<List<IMyInventory>> groups)
         {
             groups.RemoveAll(group =>
@@ -460,25 +434,47 @@ namespace IngameScript
             flat_inv_cache_.Clear();
             var cache = new List<IMyTerminalBlock>();
             GridTerminalSystem.GetBlocksOfType(cache);
+            flat_inventories_ = 0;
             foreach (var b in Schedular.DistributeForEach(cache, INVENTORY_FILTER_BATCH_SIZE, b =>
             {
                 if (b.HasInventory && IsValidInventory(b.GetInventory()))
                 {
                     flat_inv_cache_.Add(b.GetInventory());
+                    ++flat_inventories_; // so it displays live updates in the stats
                 }
             }))
             {
                 yield return false;
             }
             cache.Clear();
-           
 
-            checked_cache_.Clear();
-            foreach (var b in Schedular.DistributeForEach(flat_inv_cache_, INVENTORY_GROUPING_BATCH_SIZE, inv =>
+
+            flat_inventories_ = flat_inv_cache_.Count;
+            while (flat_inv_cache_.Count > 0)
             {
-                AddInventory(inv, flat_inv_cache_, readin);
-            }))
-            {
+                for (var n = 0; n != INVENTORY_GROUPING_BATCH_SIZE; ++n)
+                {
+                    if (flat_inv_cache_.Count == 0)
+                    {
+                        break;
+                    }
+                    var inv = flat_inv_cache_.Pop();
+                    var partition = new List<IMyInventory>(); // we are _always_ first
+                    readin.Add(partition);
+                    partition.Add(inv);
+                    cache_outdated_lookup_[inv] = false;
+                    for(var i = 0; i != flat_inv_cache_.Count; i++)
+                    {
+                        var peer = flat_inv_cache_[i];
+                        if (inv.IsConnectedTo(peer))
+                        {
+                            partition.Add(peer);
+                            cache_outdated_lookup_[inv] = false;
+                            flat_inv_cache_.RemoveAtFast(i);
+                            --i;
+                        }
+                    }
+                }
                 yield return false;
             }
             CullWeaponlessGroups(readin);
