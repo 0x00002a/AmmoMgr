@@ -99,7 +99,7 @@ namespace IngameScript
         #region Fields
         internal HashSet<MyDefinitionId> wc_weapons_ = new HashSet<MyDefinitionId>();
         internal Dictionary<IMyInventory, HashSet<MyItemType>> inv_allowlist_cache_ = new Dictionary<IMyInventory, HashSet<MyItemType>>();
-        internal List<HashSet<IMyInventory>> partitioned_invs_ = new List<HashSet<IMyInventory>>();
+        internal List<List<IMyInventory>> partitioned_invs_ = new List<List<IMyInventory>>();
         internal Dictionary<IMyInventory, Priority> requester_cache_ = new Dictionary<IMyInventory, Priority>();
         internal Dictionary<string, List<AmmoItemData>> avaliability_lookup_ = new Dictionary<string, List<AmmoItemData>>();
         internal List<string> actions_log_ = new List<string>();
@@ -420,7 +420,7 @@ namespace IngameScript
             return parent != null && Me.IsSameConstructAs(parent) && CanContainAmmo(inv);
         }
         HashSet<IMyInventory> checked_cache_ = new HashSet<IMyInventory>();
-        internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<HashSet<IMyInventory>> readin)
+        internal void AddInventory(IMyInventory inv, List<IMyInventory> all, List<List<IMyInventory>> readin)
         {
             if (!checked_cache_.Contains(inv))
             {
@@ -429,7 +429,7 @@ namespace IngameScript
 
                 if (partition == null)
                 {
-                    partition = new HashSet<IMyInventory>();
+                    partition = new List<IMyInventory>();
                     readin.Add(partition);
                 }
 
@@ -446,7 +446,7 @@ namespace IngameScript
                 }
             }
         }
-        internal void CullWeaponlessGroups(List<HashSet<IMyInventory>> groups)
+        internal void CullWeaponlessGroups(List<List<IMyInventory>> groups)
         {
             groups.RemoveAll(group =>
             {
@@ -454,7 +454,7 @@ namespace IngameScript
             });
         }
 
-        internal IEnumerator<bool> RefreshInventories(List<HashSet<IMyInventory>> readin)
+        internal IEnumerator<bool> RefreshInventories(List<List<IMyInventory>> readin)
         {
             RemoveOutdatedInvs();
             flat_inv_cache_.Clear();
@@ -470,6 +470,7 @@ namespace IngameScript
             {
                 yield return false;
             }
+            cache.Clear();
            
 
             checked_cache_.Clear();
@@ -480,12 +481,12 @@ namespace IngameScript
             {
                 yield return false;
             }
-            CullWeaponlessGroups(partitioned_invs_);
+            CullWeaponlessGroups(readin);
 
             yield break;
             
         }
-        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, HashSet<IMyInventory> requesters)
+        internal void AllotItems(double per_inv, List<AmmoItemData> avaliable, List<IMyInventory> requesters)
         {
 
             if (avaliable.Count == 0)
@@ -546,7 +547,7 @@ namespace IngameScript
             return src.Where(i => CanContainItem(i, type));
         }
 
-        private double CalcPerInv(MyItemType ammo_t, HashSet<IMyInventory> inv_system)
+        private double CalcPerInv(MyItemType ammo_t, List<IMyInventory> inv_system)
         {
             var nb_req = 0;
             var total_qty = 0.0;
@@ -568,7 +569,7 @@ namespace IngameScript
 
         }
 
-        internal IEnumerator<bool> RebalanceInventories(List<HashSet<IMyInventory>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
+        internal IEnumerator<bool> RebalanceInventories(List<List<IMyInventory>> requesters, Dictionary<string, List<AmmoItemData>> avaliable)
         {
             var per_yield = MAX_REBALANCE_TICKS / (double)requesters.Count;
             var since_yield = 0.0;
@@ -596,7 +597,7 @@ namespace IngameScript
         }
 
         readonly List<MyInventoryItem> items_tmp_ = new List<MyInventoryItem>();
-        internal void ScanInventories(List<HashSet<IMyInventory>> inventories, Dictionary<string, List<AmmoItemData>> readin)
+        internal void ScanInventories(List<List<IMyInventory>> inventories, Dictionary<string, List<AmmoItemData>> readin)
         {
             foreach(var part in inventories)
             {
